@@ -1,0 +1,1999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2nd Officer | Second Brain — VLCC</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+// 🌗 APPLY THEME
+function applyTheme(mode){
+  const body = document.body;
+  const toggle = document.getElementById('themeToggle');
+  if(mode === 'light'){
+    body.classList.add('light');
+    if(toggle) toggle.checked = true;
+  }else{
+    body.classList.remove('light');
+    if(toggle) toggle.checked = false;
+  }
+}
+
+// 🔘 TOGGLE
+function toggleTheme(){
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  applyTheme(isLight ? 'light' : 'dark');
+}
+
+// 🤖 AUTO DETECT
+(function(){
+  const saved = localStorage.getItem('theme');
+  if(saved){
+    applyTheme(saved);
+  }else{
+    const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+    applyTheme(prefersLight ? 'light' : 'dark');
+  }
+
+  window.matchMedia('(prefers-color-scheme: light)')
+    .addEventListener('change', e=>{
+      if(!localStorage.getItem('theme')){
+        applyTheme(e.matches ? 'light' : 'dark');
+      }
+    });
+})();
+
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&family=Barlow:wght@300;400;500&display=swap');
+  :root{--bg:#0a0e14;--bg2:#0f1520;--bg3:#141c2a;--panel:#111926;--border:#1e2d42;--accent:#00c8ff;--accent2:#00ff9d;--warn:#ffb300;--danger:#ff3b3b;--text:#cdd9e5;--text2:#7a95b0;--text3:#4a6070;--mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--cond:'Barlow Condensed',sans-serif;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,200,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+  /* ══════════════════════════════════
+     RESPONSIVE LAYOUT SYSTEM
+     xs: <480px  (phone portrait)
+     sm: 480-768px (phone landscape / small tablet)
+     md: 768-1024px (tablet)
+     lg: >1024px (desktop)
+  ══════════════════════════════════ */
+
+  /* ── HEADER ── */
+  header{position:sticky;top:0;z-index:100;background:rgba(10,14,20,0.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:56px;gap:12px;}
+  .logo{font-family:var(--cond);font-weight:700;font-size:18px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);white-space:nowrap;}
+  .logo span{color:var(--text2);font-weight:300;}
+  #clock{font-family:var(--mono);font-size:12px;color:var(--accent2);letter-spacing:2px;white-space:nowrap;}
+  .vessel-id{font-family:var(--mono);font-size:11px;color:var(--text3);letter-spacing:1px;text-align:right;line-height:1.4;cursor:pointer;transition:color .2s;}
+  .vessel-id:hover{color:var(--accent);}
+  .vessel-id .vname{color:var(--text2);font-size:12px;}
+
+  /* ── SYNC INDICATOR in header ── */
+  .sync-pill{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:4px 10px;border-radius:12px;border:1px solid var(--border);background:var(--bg3);white-space:nowrap;cursor:pointer;transition:all .2s;}
+  .sync-pill:hover{border-color:var(--accent);}
+  .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);}
+  .sync-pill.synced .sync-dot{background:var(--accent2);}
+  .sync-pill.syncing .sync-dot{background:var(--warn);animation:blink .8s infinite;}
+  .sync-pill.error   .sync-dot{background:var(--danger);}
+  .sync-pill.offline .sync-dot{background:var(--text3);}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+  /* ── TABLET/MOBILE: hide clock, shrink logo ── */
+  @media(max-width:768px){
+    #clock{display:none;}
+    .logo{font-size:15px;letter-spacing:2px;}
+    .vessel-id{display:none;}
+    header{padding:0 12px;height:50px;}
+  }
+  @media(max-width:480px){
+    .logo span{display:none;}
+    .sync-pill span.sync-label{display:none;}
+    .lock-btn{padding:4px 7px;}
+  }
+
+  /* ── NAV ── */
+  nav{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 16px;overflow-x:auto;scrollbar-width:none;}
+  nav::-webkit-scrollbar{display:none;}
+  .tab{font-family:var(--cond);font-size:13px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text3);padding:14px 18px;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;}
+  .tab:hover{color:var(--text);}.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+  /* Mobile nav: bottom fixed */
+  @media(max-width:768px){
+    nav{position:fixed;bottom:0;left:0;right:0;z-index:99;padding:0;border-top:1px solid var(--border);border-bottom:none;justify-content:stretch;background:rgba(10,14,20,.97);backdrop-filter:blur(12px);}
+    .tab{flex:1;min-width:0;font-size:9px;letter-spacing:1px;padding:10px 4px 14px;border-bottom:none;border-top:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;}
+    .tab.active{border-top-color:var(--accent);border-bottom-color:transparent;}
+    .tab-icon{font-size:16px;display:block;}
+    main{padding-bottom:80px;}
+  }
+  @media(min-width:769px){
+    .tab-icon{display:none;}
+  }
+
+  /* ── MAIN ── */
+  main{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:24px 16px;}
+  .section{display:none;}.section.active{display:block;}
+
+  /* Tablet: tighter padding */
+  @media(max-width:768px){main{padding:16px 12px;}}
+  @media(max-width:480px){main{padding:12px 8px;}}
+
+  /* ── DASHBOARD ── */
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:24px;}
+  @media(max-width:768px){.dash-grid{grid-template-columns:1fr 1fr;gap:10px;}}
+  @media(max-width:480px){.dash-grid{grid-template-columns:1fr 1fr;gap:8px;}}
+
+  .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:20px;position:relative;overflow:hidden;}
+  @media(max-width:768px){.stat-card{padding:14px 12px;}}
+  @media(max-width:480px){.stat-card{padding:10px 10px;}}
+
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .stat-card.cyan::before{background:var(--accent);}.stat-card.green::before{background:var(--accent2);}.stat-card.warn::before{background:var(--warn);}.stat-card.danger::before{background:var(--danger);}
+  .stat-label{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:8px;}
+  @media(max-width:480px){.stat-label{font-size:8px;letter-spacing:1px;margin-bottom:4px;}}
+  .stat-value{font-family:var(--cond);font-size:36px;font-weight:700;line-height:1;}
+  @media(max-width:768px){.stat-value{font-size:28px;}}
+  @media(max-width:480px){.stat-value{font-size:24px;}}
+  .stat-card.cyan .stat-value{color:var(--accent);}.stat-card.green .stat-value{color:var(--accent2);}.stat-card.warn .stat-value{color:var(--warn);}.stat-card.danger .stat-value{color:var(--danger);}
+  .stat-sub{font-size:12px;color:var(--text2);margin-top:6px;}
+  @media(max-width:480px){.stat-sub{font-size:10px;margin-top:3px;}}
+
+  /* ── RESPONSIVE: tables ── */
+  @media(max-width:768px){thead th{padding:7px 10px;font-size:9px;}tbody td{padding:7px 10px;font-size:12px;}.table-header{padding:10px 12px;}.th-actions{gap:6px;}.th-actions input{width:110px!important;}}
+  /* ── RESPONSIVE: forms ── */
+  @media(max-width:768px){.form-row{grid-template-columns:1fr 1fr!important;gap:8px;padding:12px;}.cargo-form-grid{grid-template-columns:1fr 1fr!important;gap:8px;padding:12px;}}
+  @media(max-width:480px){.form-row{grid-template-columns:1fr!important;}.cargo-form-grid{grid-template-columns:1fr!important;}}
+  /* ── RESPONSIVE: modal sheet from bottom on mobile ── */
+  @media(max-width:768px){.modal{max-width:100%!important;margin:0;border-radius:12px 12px 0 0;max-height:88vh;}.modal-overlay{align-items:flex-end;padding:0;}.modal-body{padding:16px;}.settings-grid{grid-template-columns:1fr!important;}}
+  @media(max-width:480px){.pin-btn{padding:12px;}.col-map-grid select{font-size:11px;padding:4px 6px;}}
+  /* ── RESPONSIVE: notes, cargo ── */
+  @media(max-width:480px){.notes-grid{grid-template-columns:1fr!important;}}
+  @media(max-width:768px){.cargo-two-col{grid-template-columns:1fr!important;}}
+
+  /* ── SYNC PILL ── */
+  .sync-pill{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:4px 10px;border-radius:12px;border:1px solid var(--border);background:var(--bg3);white-space:nowrap;cursor:pointer;transition:all .2s;}
+  .sync-pill:hover{border-color:var(--accent);}
+  .sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--text3);}
+  .sync-pill.synced .sync-dot{background:var(--accent2);}
+  .sync-pill.syncing .sync-dot{background:var(--warn);animation:blink .8s infinite;}
+  .sync-pill.error .sync-dot{background:var(--danger);}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.3;}}
+  @media(max-width:480px){.sync-label{display:none!important;}}
+
+  /* ── SYNC MODAL ── */
+  .sync-setup-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:14px;}
+  @media(max-width:480px){.sync-setup-row{grid-template-columns:1fr;}}
+  .sync-status-box{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:14px 16px;margin-bottom:14px;}
+  .sync-status-row{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:11px;margin-bottom:5px;}
+  .sync-status-row:last-child{margin-bottom:0;}
+  .sync-status-row .lbl{color:var(--text3);letter-spacing:1px;}
+  .sync-log{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px;max-height:110px;overflow-y:auto;font-family:var(--mono);font-size:10px;color:var(--text3);line-height:1.8;}
+  .sync-log .ok{color:var(--accent2);}.sync-log .err{color:var(--danger);}.sync-log .info{color:var(--accent);}
+
+  .alert-box{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--warn);border-radius:4px;padding:16px 20px;margin-bottom:16px;}
+  .alert-title{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--warn);margin-bottom:10px;}
+  .alert-item{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .alert-item:last-child{border-bottom:none;}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;letter-spacing:1px;}
+  .badge.exp{background:rgba(255,59,59,.15);color:var(--danger);border:1px solid var(--danger);}
+  .badge.low{background:rgba(255,179,0,.15);color:var(--warn);border:1px solid var(--warn);}
+  .badge.due{background:rgba(0,200,255,.1);color:var(--accent);border:1px solid var(--accent);}
+
+  /* ── TABLES ── */
+  .table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-top:16px;}
+  .table-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg3);flex-wrap:wrap;gap:8px;}
+  .table-title{font-family:var(--cond);font-size:14px;font-weight:600;letter-spacing:2px;color:var(--accent);text-transform:uppercase;}
+  .th-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead tr{background:var(--bg3);}
+  thead th{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid var(--border);}
+  tbody tr{border-bottom:1px solid rgba(30,45,66,.5);transition:background .15s;}
+  tbody tr:hover{background:rgba(0,200,255,.03);}
+  tbody td{padding:9px 14px;color:var(--text);}
+  .expired{color:var(--danger)!important;}.expiring{color:var(--warn)!important;}.ok{color:var(--accent2)!important;}
+
+  /* ── FORMS ── */
+  .form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg3);}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;}
+  .field input,.field select,.field textarea{background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:var(--sans);font-size:13px;padding:8px 10px;outline:none;transition:border .2s;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);}
+  .field select option{background:var(--bg2);}
+  .field textarea{resize:vertical;min-height:80px;}
+
+  /* ── BUTTONS ── */
+  .btn{font-family:var(--cond);font-size:12px;font-weight:600;letter-spacing:2px;text-transform:uppercase;padding:8px 16px;border:none;border-radius:3px;cursor:pointer;transition:all .2s;}
+  .btn-primary{background:var(--accent);color:var(--bg);}.btn-primary:hover{background:#29d4ff;}
+  .btn-success{background:var(--accent2);color:var(--bg);}.btn-success:hover{background:#22ffa8;}
+  .btn-outline{background:transparent;color:var(--accent);border:1px solid var(--accent);}.btn-outline:hover{background:rgba(0,200,255,.1);}
+  .btn-warn{background:rgba(255,179,0,.15);color:var(--warn);border:1px solid var(--warn);}.btn-warn:hover{background:rgba(255,179,0,.3);}
+  .btn-danger{background:rgba(255,59,59,.15);color:var(--danger);border:1px solid var(--danger);}.btn-danger:hover{background:rgba(255,59,59,.3);}
+  .btn-purple{background:rgba(180,100,255,.15);color:#c084fc;border:1px solid #c084fc;}.btn-purple:hover{background:rgba(180,100,255,.3);}
+  .btn-sm{padding:5px 10px;font-size:10px;}
+
+  /* ── MODAL ── */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;}
+  .modal{background:var(--bg2);border:1px solid var(--accent);border-radius:6px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);}
+  .modal-title{font-family:var(--cond);font-size:18px;font-weight:700;letter-spacing:3px;color:var(--accent);text-transform:uppercase;}
+  .modal-close{background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;}.modal-close:hover{color:var(--danger);}
+  .modal-body{padding:24px;}
+
+  /* ── VESSEL SETTINGS ── */
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+  @media(max-width:500px){.settings-grid{grid-template-columns:1fr;}}
+  .settings-save{display:flex;justify-content:flex-end;margin-top:8px;}
+
+  /* ── USE MODAL ── */
+  .use-modal{max-width:420px;}
+  .use-item-name{font-family:var(--cond);font-size:20px;font-weight:700;color:var(--accent);margin-bottom:4px;letter-spacing:1px;}
+  .use-stock{font-family:var(--mono);font-size:13px;color:var(--text2);margin-bottom:20px;}
+  .use-stock span{color:var(--accent2);font-size:16px;}
+  .qty-row{display:flex;gap:10px;align-items:center;margin-bottom:16px;}
+  .qty-btn{width:36px;height:36px;border-radius:3px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+  .qty-btn:hover{border-color:var(--accent);color:var(--accent);}
+  #use-qty-input{width:80px;text-align:center;font-family:var(--mono);font-size:18px;font-weight:700;padding:6px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--accent2);outline:none;}
+  #use-qty-input:focus{border-color:var(--accent);}
+  .use-reason{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-family:var(--sans);font-size:13px;padding:8px 10px;outline:none;resize:none;height:70px;}
+  .use-reason:focus{border-color:var(--accent);}
+  .use-actions{display:flex;gap:10px;margin-top:16px;justify-content:flex-end;}
+
+  /* ── ADMIN / PIN LOCK ── */
+  .lock-screen{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;}
+  .lock-box{background:var(--bg2);border:1px solid var(--accent);border-radius:8px;padding:40px 36px;text-align:center;width:320px;}
+  .lock-logo{font-family:var(--cond);font-size:22px;font-weight:700;letter-spacing:4px;color:var(--accent);margin-bottom:4px;}
+  .lock-sub{font-family:var(--mono);font-size:11px;color:var(--text3);letter-spacing:2px;margin-bottom:28px;}
+  .pin-dots{display:flex;gap:10px;justify-content:center;margin-bottom:20px;}
+  .pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);background:transparent;transition:all .2s;}
+  .pin-dot.filled{background:var(--accent);border-color:var(--accent);}
+  .pin-dot.error{background:var(--danger);border-color:var(--danger);}
+  .pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+  .pin-btn{background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--cond);font-size:20px;font-weight:600;padding:14px;cursor:pointer;transition:all .2s;}
+  .pin-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .pin-btn:active{background:rgba(0,200,255,.1);}
+  .pin-clear{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer;margin-top:4px;letter-spacing:1px;}
+  .pin-clear:hover{color:var(--warn);}
+  .pin-err{font-family:var(--mono);font-size:11px;color:var(--danger);margin-top:8px;letter-spacing:1px;min-height:16px;}
+  .admin-badge{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--accent2);background:rgba(0,255,157,.08);border:1px solid rgba(0,255,157,.3);padding:2px 8px;border-radius:2px;margin-left:8px;}
+  /* Lock button in header */
+  .lock-btn{background:none;border:1px solid var(--border);border-radius:3px;color:var(--text3);font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:4px 10px;cursor:pointer;transition:all .2s;}
+  .lock-btn:hover{border-color:var(--danger);color:var(--danger);}
+
+  /* ── CARGO OPERATIONS ── */
+  .cargo-two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+  @media(max-width:700px){.cargo-two-col{grid-template-columns:1fr;}}
+  .cargo-panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;}
+  .cargo-panel-head{padding:12px 18px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .cargo-panel-title{font-family:var(--cond);font-size:13px;font-weight:600;letter-spacing:2px;color:var(--accent);text-transform:uppercase;}
+  .cargo-list{padding:0;}
+  .cargo-item{padding:12px 18px;border-bottom:1px solid rgba(30,45,66,.5);transition:background .15s;cursor:pointer;}
+  .cargo-item:last-child{border-bottom:none;}
+  .cargo-item:hover{background:rgba(0,200,255,.03);}
+  .cargo-item-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .cargo-item-name{font-weight:600;font-size:13px;}
+  .cargo-item-meta{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px;letter-spacing:1px;}
+  .cargo-badge{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:2px;white-space:nowrap;}
+  .cargo-badge.load{background:rgba(0,200,255,.1);color:var(--accent);border:1px solid var(--accent);}
+  .cargo-badge.disch{background:rgba(0,255,157,.1);color:var(--accent2);border:1px solid var(--accent2);}
+  .cargo-badge.sts{background:rgba(255,179,0,.1);color:var(--warn);border:1px solid var(--warn);}
+  .cargo-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;padding:14px 18px;background:var(--bg3);border-bottom:1px solid var(--border);}
+
+  /* ── USAGE LOG ── */
+  .log-entry{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .log-entry:last-child{border-bottom:none;}
+  .log-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:4px;flex-shrink:0;}
+  .log-dot.stat{background:var(--accent2);}
+  .log-info{flex:1;}
+  .log-name{font-size:13px;font-weight:500;}
+  .log-meta{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px;letter-spacing:1px;}
+  .log-qty{font-family:var(--mono);font-size:13px;color:var(--danger);white-space:nowrap;}
+
+  /* ── IMPORT ── */
+  .drop-zone{border:2px dashed var(--border);border-radius:6px;padding:36px 24px;text-align:center;cursor:pointer;transition:all .2s;position:relative;}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:rgba(0,200,255,.04);}
+  .drop-icon{font-size:36px;margin-bottom:10px;}
+  .drop-label{font-family:var(--cond);font-size:15px;letter-spacing:2px;color:var(--text2);margin-bottom:4px;}
+  .drop-sub{font-family:var(--mono);font-size:11px;color:var(--text3);}
+  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+  .sheet-picker{margin-top:14px;}
+  .sheet-picker label{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:6px;}
+  .sheet-picker select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;font-size:13px;border-radius:3px;outline:none;}
+  .col-mapper{margin-top:18px;}
+  .col-mapper-title{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-bottom:10px;}
+  .col-map-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:7px;}
+  .col-map-grid select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 8px;font-size:12px;border-radius:3px;outline:none;}
+  .field-label{font-family:var(--mono);font-size:11px;color:var(--text2);padding:5px 0;}
+  .required-star{color:var(--danger);}
+  .import-steps{display:flex;gap:0;margin-bottom:18px;}
+  .imp-step{flex:1;padding:9px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--text3);border-bottom:2px solid var(--border);text-transform:uppercase;}
+  .imp-step.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .imp-step.done{color:var(--accent2);border-bottom-color:var(--accent2);}
+  .preview-wrap{margin-top:16px;overflow-x:auto;border:1px solid var(--border);border-radius:4px;}
+  .preview-title{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text3);padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+  .preview-wrap table{font-size:11px;}
+  .preview-wrap thead th{padding:5px 10px;font-size:9px;}
+  .preview-wrap tbody td{padding:4px 10px;}
+  .template-box{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:14px 18px;margin-bottom:18px;}
+  .template-box-title{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;}
+
+  /* ── NOTES ── */
+  .notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:16px;}
+  .note-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:14px;position:relative;}
+  .note-meta{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:6px;letter-spacing:1px;}
+  .note-body{font-size:13px;line-height:1.6;color:var(--text);white-space:pre-wrap;}
+  .note-tag{display:inline-block;margin-top:8px;font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;background:rgba(0,200,255,.1);color:var(--accent);border:1px solid rgba(0,200,255,.3);}
+  .note-del{position:absolute;top:10px;right:10px;background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;}.note-del:hover{color:var(--danger);}
+
+  .sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
+  .sec-title{font-family:var(--cond);font-size:20px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--accent);}
+  .sec-title span{color:var(--text2);font-weight:300;}
+  .sec-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .empty{text-align:center;padding:36px;color:var(--text3);font-family:var(--mono);font-size:11px;letter-spacing:2px;}
+
+  #toast{position:fixed;bottom:24px;right:24px;z-index:999;background:var(--accent);color:var(--bg);font-family:var(--mono);font-size:12px;letter-spacing:1px;padding:10px 20px;border-radius:3px;opacity:0;transition:opacity .3s;pointer-events:none;}
+  #toast.show{opacity:1;}#toast.success{background:var(--accent2);}#toast.warn{background:var(--warn);}#toast.error{background:var(--danger);}
+  ::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  @media(max-width:600px){.dash-grid{grid-template-columns:1fr 1fr;}.form-row{grid-template-columns:1fr;}}
+
+  /* ── USAGE LOG TAB ── */
+  .log-filter{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .log-filter button{font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:5px 12px;border-radius:2px;border:1px solid var(--border);background:none;color:var(--text3);cursor:pointer;transition:all .2s;}
+  .log-filter button.active{border-color:var(--accent);color:var(--accent);}
+
+/* 🌗 THEME TRANSITION */
+body{transition: background 0.3s ease, color 0.3s ease;}
+*{transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;}
+
+/* 🌞 LIGHT MODE */
+body.light{
+  --bg:#f5f7fb;
+  --bg2:#ffffff;
+  --bg3:#eef2f7;
+  --panel:#ffffff;
+  --border:#d0d7e2;
+  --accent:#0077ff;
+  --accent2:#00b37a;
+  --warn:#ff9800;
+  --danger:#e53935;
+  --text:#1b2a3a;
+  --text2:#4a6070;
+  --text3:#7a95b0;
+}
+
+/* 🍏 iOS TOGGLE */
+.theme-switch{position:relative;width:44px;height:24px;}
+.theme-switch input{display:none;}
+.slider{position:absolute;cursor:pointer;inset:0;background:#444;border-radius:50px;transition:.3s;}
+.slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:white;border-radius:50%;transition:.3s;}
+input:checked + .slider{background:#4cd964;}
+input:checked + .slider:before{transform:translateX(20px);}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">2ND OFF <span>// BRAIN</span></div>
+  <div id="clock">UTC 00:00:00</div>
+  <div id="sync-pill" class="sync-pill offline" onclick="openSyncModal()" title="Cloud Sync">
+    <div class="sync-dot"></div>
+    <span class="sync-label" id="sync-label">OFFLINE</span>
+  </div>
+<label class="theme-switch">
+  <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+  <span class="slider"></span>
+</label>
+<button class="lock-btn" onclick="lockApp()" id="lock-header-btn" style="display:none;" title="Lock App">🔒 LOCK</button>
+  <div class="vessel-id" onclick="openSettings()" title="Click to edit vessel info">
+    <div class="vname" id="hdr-vname">M/T VESSEL NAME</div>
+    <div id="hdr-imo">IMO 0000000 · MMSI 000000000</div>
+  </div>
+</header>
+
+<nav>
+  <button class="tab active"  onclick="showTab('dashboard',this)"><span class="tab-icon">⬡</span>Dashboard</button>
+  <button class="tab" onclick="showTab('medical',this)"><span class="tab-icon">⚕</span>Medical</button>
+  <button class="tab" onclick="showTab('stationery',this)"><span class="tab-icon">📦</span>Stationery</button>
+  <button class="tab" onclick="showTab('navequip',this)"><span class="tab-icon">🧭</span>Nav Equip</button>
+  <button class="tab" onclick="showTab('usagelog',this)"><span class="tab-icon">📊</span>Log</button>
+  <button class="tab" onclick="showTab('cargo',this)"><span class="tab-icon">🛢</span>Cargo</button>
+  <button class="tab" onclick="showTab('notes',this)"><span class="tab-icon">📋</span>Notes</button>
+</nav>
+
+<main>
+
+<!-- ══════════════════ DASHBOARD ══════════════════ -->
+<div id="dashboard" class="section active">
+  <div class="sec-head">
+    <div class="sec-title">OVERVIEW <span>// ALL SYSTEMS</span></div>
+    <div class="sec-actions">
+      <span id="dash-date" style="font-family:var(--mono);font-size:11px;color:var(--text3);align-self:center;"></span>
+      <button class="btn btn-outline btn-sm" onclick="exportAll()">⬇ Export All</button>
+      <button class="btn btn-outline btn-sm" onclick="openSettings()">⚙ Vessel Settings</button>
+    </div>
+  </div>
+  <div class="dash-grid" id="dash-stats"></div>
+  <div id="dash-alerts"></div>
+</div>
+
+<!-- ══════════════════ MEDICAL ══════════════════ -->
+<div id="medical" class="section">
+  <div class="sec-head">
+    <div class="sec-title">⚕ MEDICAL <span>// STORE</span></div>
+    <div class="sec-actions">
+      <button class="btn btn-success btn-sm" onclick="openImport('medical')">⬆ Import</button>
+      <button class="btn btn-purple btn-sm" onclick="exportSection('medical')">⬇ Export</button>
+      <button class="btn btn-outline btn-sm" onclick="dlTemplate('medical')">⬇ Template</button>
+      <button class="btn btn-primary btn-sm" onclick="toggleForm('med-form')">+ Add</button>
+    </div>
+  </div>
+  <div class="table-wrap" id="med-form" style="display:none;margin-bottom:16px;">
+    <div class="form-row">
+      <div class="field"><label>Item Name</label><input id="m-name" placeholder="e.g. Paracetamol 500mg"></div>
+      <div class="field"><label>Category</label><select id="m-cat"><option>Analgesic</option><option>Antibiotic</option><option>Antiseptic</option><option>Cardiac</option><option>GI</option><option>Respiratory</option><option>Wound Care</option><option>IV Fluid</option><option>Equipment</option><option>Other</option></select></div>
+      <div class="field"><label>Qty</label><input id="m-qty" type="number" placeholder="0" min="0"></div>
+      <div class="field"><label>Unit</label><input id="m-unit" placeholder="tabs / vials / box"></div>
+      <div class="field"><label>Min Stock</label><input id="m-min" type="number" placeholder="0"></div>
+      <div class="field"><label>Expiry Date</label><input id="m-exp" type="date"></div>
+      <div class="field"><label>Location</label><input id="m-loc" placeholder="e.g. Cabinet A-2"></div>
+      <div class="field" style="align-self:flex-end;"><button class="btn btn-primary" onclick="addMedItem()">SAVE</button></div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-header">
+      <span class="table-title">INVENTORY (<span id="med-count">0</span>)</span>
+      <div class="th-actions">
+        <input style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 10px;font-size:12px;border-radius:3px;outline:none;width:150px;" placeholder="Search..." oninput="filterTable('med-tbody',this.value)">
+        <button class="btn btn-warn btn-sm" onclick="clearData('medical')">CLEAR</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table><thead><tr><th>#</th><th>Item</th><th>Cat</th><th>Qty</th><th>Min</th><th>Expiry</th><th>Location</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody id="med-tbody"><tr><td colspan="9" class="empty">NO ITEMS</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ STATIONERY ══════════════════ -->
+<div id="stationery" class="section">
+  <div class="sec-head">
+    <div class="sec-title">📦 STATIONERY <span>// INVENTORY</span></div>
+    <div class="sec-actions">
+      <button class="btn btn-success btn-sm" onclick="openImport('stationery')">⬆ Import</button>
+      <button class="btn btn-purple btn-sm" onclick="exportSection('stationery')">⬇ Export</button>
+      <button class="btn btn-outline btn-sm" onclick="dlTemplate('stationery')">⬇ Template</button>
+      <button class="btn btn-primary btn-sm" onclick="toggleForm('stat-form')">+ Add</button>
+    </div>
+  </div>
+  <div class="table-wrap" id="stat-form" style="display:none;margin-bottom:16px;">
+    <div class="form-row">
+      <div class="field"><label>Item Name</label><input id="s-name" placeholder="e.g. A4 Paper"></div>
+      <div class="field"><label>Category</label><select id="s-cat"><option>Paper / Forms</option><option>Printing</option><option>Writing</option><option>Filing</option><option>IT Consumables</option><option>Cleaning</option><option>Other</option></select></div>
+      <div class="field"><label>Qty</label><input id="s-qty" type="number" placeholder="0" min="0"></div>
+      <div class="field"><label>Unit</label><input id="s-unit" placeholder="pcs / reams / boxes"></div>
+      <div class="field"><label>Min Stock</label><input id="s-min" type="number" placeholder="0"></div>
+      <div class="field"><label>Location</label><input id="s-loc" placeholder="e.g. Chart Room"></div>
+      <div class="field" style="align-self:flex-end;"><button class="btn btn-primary" onclick="addStatItem()">SAVE</button></div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-header">
+      <span class="table-title">INVENTORY (<span id="stat-count">0</span>)</span>
+      <div class="th-actions">
+        <input style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 10px;font-size:12px;border-radius:3px;outline:none;width:150px;" placeholder="Search..." oninput="filterTable('stat-tbody',this.value)">
+        <button class="btn btn-warn btn-sm" onclick="clearData('stationery')">CLEAR</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table><thead><tr><th>#</th><th>Item</th><th>Cat</th><th>Qty</th><th>Min</th><th>Location</th><th>Status</th><th>Updated</th><th>Action</th></tr></thead>
+      <tbody id="stat-tbody"><tr><td colspan="9" class="empty">NO ITEMS</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ NAV EQUIP ══════════════════ -->
+<div id="navequip" class="section">
+  <div class="sec-head">
+    <div class="sec-title">🧭 NAV EQUIP <span>// MAINTENANCE</span></div>
+    <div class="sec-actions">
+      <button class="btn btn-success btn-sm" onclick="openImport('navequip')">⬆ Import</button>
+      <button class="btn btn-purple btn-sm" onclick="exportSection('navequip')">⬇ Export</button>
+      <button class="btn btn-outline btn-sm" onclick="dlTemplate('navequip')">⬇ Template</button>
+      <button class="btn btn-primary btn-sm" onclick="toggleForm('nav-form')">+ Add</button>
+    </div>
+  </div>
+  <div class="table-wrap" id="nav-form" style="display:none;margin-bottom:16px;">
+    <div class="form-row">
+      <div class="field"><label>Equipment</label><input id="n-name" placeholder="e.g. Gyrocompass (Main)"></div>
+      <div class="field"><label>Type</label><select id="n-type"><option>Compass</option><option>RADAR</option><option>ECDIS</option><option>AIS</option><option>GPS / GNSS</option><option>VHF / GMDSS</option><option>Echo Sounder</option><option>Speed Log</option><option>ARPA</option><option>Autopilot</option><option>Weather Fax</option><option>NAVTEX</option><option>Other</option></select></div>
+      <div class="field"><label>Maker/Model</label><input id="n-maker" placeholder="e.g. JRC JLR-7900"></div>
+      <div class="field"><label>Last Maint.</label><input id="n-last" type="date"></div>
+      <div class="field"><label>Next Due</label><input id="n-next" type="date"></div>
+      <div class="field"><label>Interval (days)</label><input id="n-interval" type="number" placeholder="365"></div>
+      <div class="field"><label>Remarks</label><input id="n-rem" placeholder="Condition / notes"></div>
+      <div class="field" style="align-self:flex-end;"><button class="btn btn-primary" onclick="addNavItem()">SAVE</button></div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <div class="table-header">
+      <span class="table-title">EQUIPMENT (<span id="nav-count">0</span>)</span>
+      <div class="th-actions">
+        <input style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 10px;font-size:12px;border-radius:3px;outline:none;width:150px;" placeholder="Search..." oninput="filterTable('nav-tbody',this.value)">
+        <button class="btn btn-warn btn-sm" onclick="clearData('navequip')">CLEAR</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table><thead><tr><th>#</th><th>Equipment</th><th>Type</th><th>Maker</th><th>Last</th><th>Next Due</th><th>Days Left</th><th>Remarks</th><th></th></tr></thead>
+      <tbody id="nav-tbody"><tr><td colspan="9" class="empty">NO EQUIPMENT</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ USAGE LOG ══════════════════ -->
+<div id="usagelog" class="section">
+  <div class="sec-head">
+    <div class="sec-title">📊 USAGE <span>// LOG</span></div>
+    <div class="sec-actions">
+      <button class="btn btn-purple btn-sm" onclick="exportSection('log')">⬇ Export Log</button>
+      <button class="btn btn-danger btn-sm" onclick="clearLog()">CLEAR LOG</button>
+    </div>
+  </div>
+  <div class="log-filter">
+    <button class="active" onclick="filterLog('all',this)">ALL</button>
+    <button onclick="filterLog('medical',this)">⚕ MEDICAL</button>
+    <button onclick="filterLog('stationery',this)">📦 STATIONERY</button>
+  </div>
+  <div class="table-wrap">
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>#</th><th>Date / Time</th><th>Category</th><th>Item</th><th>Qty Used</th><th>Remaining</th><th>Reason / Note</th></tr></thead>
+        <tbody id="log-tbody"><tr><td colspan="7" class="empty">NO USAGE RECORDED YET</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ NOTES ══════════════════ -->
+<div id="notes" class="section">
+  <div class="sec-head"><div class="sec-title">📋 NOTES <span>// TASKS</span></div></div>
+  <div class="table-wrap" style="margin-bottom:20px;">
+    <div class="form-row" style="grid-template-columns:1fr 1fr auto;align-items:end;">
+      <div class="field" style="grid-column:1/-1"><label>Note / Task</label><textarea id="note-body" placeholder="Watch handover, task, defect, reminder…"></textarea></div>
+      <div class="field"><label>Tag</label><select id="note-tag"><option>GENERAL</option><option>WATCH</option><option>DEFECT</option><option>TASK</option><option>MEDICAL</option><option>STATIONERY</option><option>NAV-EQUIP</option><option>PORT ARRIVAL</option><option>URGENT</option></select></div>
+      <div class="field" style="align-self:flex-end;"><button class="btn btn-primary" onclick="addNote()">SAVE</button></div>
+    </div>
+  </div>
+  <div class="notes-grid" id="notes-grid"><div class="empty" style="grid-column:1/-1">NO NOTES YET</div></div>
+</div>
+
+<!-- ══════════════════ CARGO OPERATIONS ══════════════════ -->
+<div id="cargo" class="section">
+  <div class="sec-head">
+    <div class="sec-title">🛢 CARGO OPS <span>// RECORDS</span></div>
+    <div class="sec-actions">
+      <button class="btn btn-success btn-sm" onclick="openImport('cargo_ops')">⬆ Import Ops</button>
+      <button class="btn btn-success btn-sm" onclick="openImport('cargo_sts')">⬆ Import STS</button>
+      <button class="btn btn-outline btn-sm" onclick="dlTemplate('cargo_ops')">⬇ Ops Template</button>
+      <button class="btn btn-outline btn-sm" onclick="dlTemplate('cargo_sts')">⬇ STS Template</button>
+      <button class="btn btn-purple btn-sm" onclick="exportSection('cargo')">⬇ Export All</button>
+      <button class="btn btn-primary btn-sm" onclick="toggleForm('cargo-op-form')">+ Add Cargo Op</button>
+      <button class="btn btn-warn btn-sm" onclick="toggleForm('cargo-sts-form')">+ Add STS</button>
+    </div>
+  </div>
+
+  <!-- ADD CARGO OP FORM -->
+  <div class="table-wrap" id="cargo-op-form" style="display:none;margin-bottom:16px;">
+    <div class="cargo-form-grid">
+      <div class="field"><label>Port / Location</label><input id="co-port" placeholder="e.g. Ras Tanura, KSA"></div>
+      <div class="field"><label>Operation</label><select id="co-type"><option>Loading</option><option>Discharging</option><option>Part Load</option><option>Part Discharge</option><option>Shifting</option></select></div>
+      <div class="field"><label>Cargo Type</label><input id="co-cargo" placeholder="e.g. Arabian Light Crude"></div>
+      <div class="field"><label>Quantity (MT)</label><input id="co-qty" type="number" placeholder="0"></div>
+      <div class="field"><label>API Gravity</label><input id="co-api" placeholder="e.g. 34.5"></div>
+      <div class="field"><label>Commenced (UTC)</label><input id="co-start" type="datetime-local"></div>
+      <div class="field"><label>Completed (UTC)</label><input id="co-end" type="datetime-local"></div>
+      <div class="field"><label>Terminal / Berth</label><input id="co-berth" placeholder="e.g. Berth No.4"></div>
+      <div class="field"><label>Charterer</label><input id="co-charter" placeholder="e.g. Shell Trading"></div>
+      <div class="field"><label>Remarks</label><input id="co-rem" placeholder="Any notes…"></div>
+      <div class="field" style="align-self:flex-end;"><button class="btn btn-primary" onclick="addCargoOp()">SAVE</button></div>
+    </div>
+  </div>
+
+  <!-- ADD STS FORM -->
+  <div class="table-wrap" id="cargo-sts-form" style="display:none;margin-bottom:16px;">
+    <div class="cargo-form-grid">
+      <div class="field"><label>Other Vessel</label><input id="sts-vessel" placeholder="e.g. M/T PACIFIC RUBY"></div>
+      <div class="field"><label>IMO (other)</label><input id="sts-imo" placeholder="9999999"></div>
+      <div class="field"><label>STS Type</label><select id="sts-type"><option>Ship-to-Ship Transfer (Give)</option><option>Ship-to-Ship Transfer (Receive)</option></select></div>
+      <div class="field"><label>Cargo</label><input id="sts-cargo" placeholder="e.g. Arabian Light Crude"></div>
+      <div class="field"><label>Quantity (MT)</label><input id="sts-qty" type="number" placeholder="0"></div>
+      <div class="field"><label>Location / Area</label><input id="sts-loc" placeholder="e.g. Hormuz Anchorage"></div>
+      <div class="field"><label>Commenced (UTC)</label><input id="sts-start" type="datetime-local"></div>
+      <div class="field"><label>Completed (UTC)</label><input id="sts-end" type="datetime-local"></div>
+      <div class="field"><label>Mooring Master</label><input id="sts-mm" placeholder="Name / Company"></div>
+      <div class="field"><label>Remarks</label><input id="sts-rem" placeholder="Weather, sea state, issues…"></div>
+      <div class="field" style="align-self:flex-end;"><button class="btn btn-warn" onclick="addSTS()">SAVE</button></div>
+    </div>
+  </div>
+
+  <div class="cargo-two-col">
+    <!-- LAST 10 CARGO OPS -->
+    <div class="cargo-panel">
+      <div class="cargo-panel-head">
+        <span class="cargo-panel-title">⚓ LAST 10 CARGO OPS</span>
+        <span id="cargo-op-count" style="font-family:var(--mono);font-size:10px;color:var(--text3);">0 records</span>
+      </div>
+      <div class="cargo-list" id="cargo-op-list"><div class="empty" style="padding:28px;">NO RECORDS YET</div></div>
+    </div>
+    <!-- LAST 10 STS -->
+    <div class="cargo-panel">
+      <div class="cargo-panel-head">
+        <span class="cargo-panel-title">🔄 LAST 10 STS OPS</span>
+        <span id="cargo-sts-count" style="font-family:var(--mono);font-size:10px;color:var(--text3);">0 records</span>
+      </div>
+      <div class="cargo-list" id="cargo-sts-list"><div class="empty" style="padding:28px;">NO RECORDS YET</div></div>
+    </div>
+  </div>
+
+  <!-- FULL TABLE -->
+  <div class="table-wrap" style="margin-top:0;">
+    <div class="table-header">
+      <span class="table-title">ALL CARGO RECORDS</span>
+      <div class="th-actions">
+        <input style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 10px;font-size:12px;border-radius:3px;outline:none;width:150px;" placeholder="Search..." oninput="filterTable('cargo-all-tbody',this.value)">
+        <button class="btn btn-danger btn-sm" onclick="clearCargoData()">CLEAR ALL</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>#</th><th>Type</th><th>Port / Location</th><th>Cargo</th><th>Qty (MT)</th><th>Commenced</th><th>Completed</th><th>Remarks</th><th></th></tr></thead>
+        <tbody id="cargo-all-tbody"><tr><td colspan="9" class="empty">NO RECORDS</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ CLOUD SYNC MODAL ══════════════════ -->
+<div class="modal-overlay" id="sync-modal" style="display:none;" onclick="if(event.target===this)closeSyncModal()">
+  <div class="modal" style="max-width:560px;border-color:var(--accent2);">
+    <div class="modal-head">
+      <span class="modal-title" style="color:var(--accent2);">☁ FIREBASE SYNC</span>
+      <button class="modal-close" onclick="closeSyncModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- TABS: Setup / Status -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
+        <button id="stab-setup" onclick="showSyncTab('setup')" style="flex:1;padding:9px;font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);color:var(--accent);">SETUP</button>
+        <button id="stab-status" onclick="showSyncTab('status')" style="flex:1;padding:9px;font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:var(--text3);">STATUS / LOG</button>
+      </div>
+
+      <!-- SETUP TAB -->
+      <div id="sync-tab-setup">
+        <!-- Guide -->
+        <div style="background:rgba(0,255,157,.05);border:1px solid rgba(0,255,157,.2);border-radius:4px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.8;">
+          <strong style="color:var(--accent2);font-family:var(--mono);font-size:10px;letter-spacing:1px;">FIREBASE SETUP (one-time · 5 min)</strong><br>
+          <span style="color:var(--text3);font-family:var(--mono);font-size:9px;">console.firebase.google.com</span><br><br>
+          <b style="color:var(--text);">1.</b> Go to <strong>console.firebase.google.com</strong> → <em>Add project</em><br>
+          <b style="color:var(--text);">2.</b> Disable Google Analytics → Create project<br>
+          <b style="color:var(--text);">3.</b> Left sidebar → <strong>Build → Firestore Database</strong> → Create<br>
+          <b style="color:var(--text);">4.</b> Choose <em>Start in test mode</em> → select your region → Done<br>
+          <b style="color:var(--text);">5.</b> Left sidebar → <strong>Project Settings ⚙</strong> (gear icon)<br>
+          <b style="color:var(--text);">6.</b> Copy <em>Project ID</em> → paste below<br>
+          <b style="color:var(--text);">7.</b> Click <em>Add app → Web (&lt;/&gt;)</em> → copy <em>apiKey</em> → paste below
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div class="field"><label>Firebase Project ID</label><input id="fb-project-id" placeholder="my-project-12345" style="font-size:12px;"></div>
+          <div class="field"><label>Firebase API Key</label><input id="fb-api-key" placeholder="AIzaSy…" type="password" style="font-size:12px;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:12px;">
+          <div class="field"><label>Document ID <span style="color:var(--text3);font-weight:300;">(any unique name for your vessel)</span></label><input id="fb-doc-id" placeholder="e.g. vessel-oceanspirit" style="font-size:12px;"></div>
+          <button class="btn btn-success" onclick="saveFbConfig()">SAVE & TEST</button>
+        </div>
+        <div id="fb-test-result" style="font-family:var(--mono);font-size:11px;min-height:18px;margin-bottom:4px;"></div>
+      </div>
+
+      <!-- STATUS TAB -->
+      <div id="sync-tab-status" style="display:none;">
+        <div class="sync-status-box">
+          <div class="sync-status-row"><span class="lbl">STATUS</span><span class="val" id="ss-status">Not configured</span></div>
+          <div class="sync-status-row"><span class="lbl">PROJECT ID</span><span class="val" id="ss-project" style="color:var(--accent2);">—</span></div>
+          <div class="sync-status-row"><span class="lbl">LAST PUSH</span><span class="val" id="ss-push">—</span></div>
+          <div class="sync-status-row"><span class="lbl">LAST PULL</span><span class="val" id="ss-pull">—</span></div>
+          <div class="sync-status-row"><span class="lbl">AUTO SYNC</span>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="auto-sync-toggle" onchange="toggleAutoSync()" style="width:14px;height:14px;">
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);" id="auto-sync-label">OFF</span>
+            </label>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <button class="btn btn-success" onclick="syncPush()">⬆ PUSH TO FIREBASE</button>
+          <button class="btn btn-outline" onclick="syncPull()">⬇ PULL FROM FIREBASE</button>
+          <button class="btn btn-warn btn-sm" onclick="clearFbConfig()">DISCONNECT</button>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--text3);margin-bottom:6px;">SYNC LOG</div>
+        <div class="sync-log" id="sync-log"><span style="color:var(--text3);">No activity yet</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ══════════════════ PIN LOCK SCREEN ══════════════════ -->
+<div class="lock-screen" id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-logo">2ND OFF // BRAIN</div>
+    <div class="lock-sub" id="lock-subtitle">ENTER ADMIN PIN</div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinInput('1')">1</button>
+      <button class="pin-btn" onclick="pinInput('2')">2</button>
+      <button class="pin-btn" onclick="pinInput('3')">3</button>
+      <button class="pin-btn" onclick="pinInput('4')">4</button>
+      <button class="pin-btn" onclick="pinInput('5')">5</button>
+      <button class="pin-btn" onclick="pinInput('6')">6</button>
+      <button class="pin-btn" onclick="pinInput('7')">7</button>
+      <button class="pin-btn" onclick="pinInput('8')">8</button>
+      <button class="pin-btn" onclick="pinInput('9')">9</button>
+      <button class="pin-btn" onclick="pinClear()" style="font-size:13px;color:var(--text3);">CLR</button>
+      <button class="pin-btn" onclick="pinInput('0')">0</button>
+      <button class="pin-btn" onclick="pinBackspace()" style="font-size:16px;">⌫</button>
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+    <div style="margin-top:12px;font-family:var(--mono);font-size:10px;color:var(--text3);">Default PIN: <span style="color:var(--accent2);">1234</span> · Change in Settings</div>
+  </div>
+</div>
+
+<!-- ══════════════════ VESSEL SETTINGS MODAL ══════════════════ -->
+<div class="modal-overlay" id="settings-modal" style="display:none;" onclick="if(event.target===this)closeSettings()">
+  <div class="modal" style="max-width:520px;border-color:var(--accent2);">
+    <div class="modal-head">
+      <span class="modal-title" style="color:var(--accent2);">⚙ VESSEL SETTINGS</span>
+      <button class="modal-close" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="settings-grid">
+        <div class="field"><label>Vessel Name</label><input id="vs-name" placeholder="M/T OCEAN SPIRIT"></div>
+        <div class="field"><label>IMO Number</label><input id="vs-imo" placeholder="9999999"></div>
+        <div class="field"><label>MMSI</label><input id="vs-mmsi" placeholder="000000000"></div>
+        <div class="field"><label>Call Sign</label><input id="vs-call" placeholder="9ABC1"></div>
+        <div class="field"><label>Flag State</label><input id="vs-flag" placeholder="Marshall Islands"></div>
+        <div class="field"><label>DWT (tonnes)</label><input id="vs-dwt" placeholder="320000"></div>
+        <div class="field"><label>Build Year</label><input id="vs-year" placeholder="2018"></div>
+        <div class="field"><label>Shipowner / Manager</label><input id="vs-owner" placeholder="ABC Tankers Ltd."></div>
+      </div>
+      <div class="field" style="margin-bottom:16px;"><label>Your Name / Rank</label><input id="vs-officer" placeholder="2/O John Smith"></div>
+      <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px;">
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--accent);margin-bottom:12px;">🔒 SECURITY</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field"><label>New PIN (4 digits)</label><input id="vs-pin-new" type="password" maxlength="4" placeholder="····" inputmode="numeric"></div>
+          <div class="field"><label>Confirm PIN</label><input id="vs-pin-confirm" type="password" maxlength="4" placeholder="····" inputmode="numeric"></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:6px;">Leave blank to keep current PIN</div>
+      </div>
+      <div class="settings-save"><button class="btn btn-success" onclick="saveSettings()">SAVE SETTINGS</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ USE ITEM MODAL ══════════════════ -->
+<div class="modal-overlay" id="use-modal" style="display:none;" onclick="if(event.target===this)closeUseModal()">
+  <div class="modal use-modal">
+    <div class="modal-head">
+      <span class="modal-title">USE ITEM</span>
+      <button class="modal-close" onclick="closeUseModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="use-item-name" id="use-item-name">—</div>
+      <div class="use-stock">Current stock: <span id="use-stock-val">0</span> <span id="use-stock-unit"></span></div>
+      <label style="font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--text3);display:block;margin-bottom:8px;">QUANTITY TO USE</label>
+      <div class="qty-row">
+        <button class="qty-btn" onclick="adjustUseQty(-1)">−</button>
+        <input type="number" id="use-qty-input" value="1" min="1">
+        <button class="qty-btn" onclick="adjustUseQty(1)">+</button>
+      </div>
+      <label style="font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--text3);display:block;margin-bottom:6px;">REASON / NOTE (optional)</label>
+      <textarea class="use-reason" id="use-reason" placeholder="e.g. Used for crew member – headache, cabin 4…"></textarea>
+      <div class="use-actions">
+        <button class="btn btn-outline" onclick="closeUseModal()">CANCEL</button>
+        <button class="btn btn-danger" onclick="confirmUse()">DEDUCT STOCK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ IMPORT MODAL ══════════════════ -->
+<div class="modal-overlay" id="import-modal" style="display:none;" onclick="if(event.target===this)closeImport()">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="modal-title">Import Excel</span>
+      <button class="modal-close" onclick="closeImport()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast">SAVED</div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let state = {
+  vessel:{ name:'M/T VESSEL NAME', imo:'0000000', mmsi:'000000000', callsign:'', flag:'', dwt:'', year:'', owner:'', officer:'' },
+  medical:[], stationery:[], navEquip:[], notes:[], usageLog:[],
+  cargo:{ ops:[], sts:[] },
+  pin: '1234'
+};
+let importCtx = {type:'',wb:null,sheets:[],parsedRows:[],mapping:{}};
+let useCtx = {type:'',id:'',name:'',stock:0,unit:''};
+let logFilter = 'all';
+
+// ── PIN ENTRY state ──
+let pinBuffer = '';
+const PIN_LEN = 4;
+
+function save(){ try{localStorage.setItem('2off_v5',JSON.stringify(state));}catch(e){} }
+function load(){
+  try{
+    // try v5 first, then fall back to v3 data
+    let d=localStorage.getItem('2off_v5');
+    if(!d) d=localStorage.getItem('2off_v3');
+    if(d){
+      const parsed=JSON.parse(d);
+      state={...state,...parsed};
+      if(!state.cargo) state.cargo={ops:[],sts:[]};
+      if(!state.pin) state.pin='1234';
+    }
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════════
+//  NAV HELPER — click from dashboard to section
+// ══════════════════════════════════════════════════
+function navTo(tabId){
+  const btn = [...document.querySelectorAll('.tab')].find(b=>b.getAttribute('onclick')&&b.getAttribute('onclick').includes(`'${tabId}'`));
+  showTab(tabId, btn||null);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ══════════════════════════════════════════════════
+//  PIN LOCK
+// ══════════════════════════════════════════════════
+function pinInput(digit){
+  if(pinBuffer.length>=PIN_LEN) return;
+  pinBuffer+=digit;
+  updatePinDots();
+  if(pinBuffer.length===PIN_LEN) setTimeout(checkPin,150);
+}
+function pinBackspace(){ pinBuffer=pinBuffer.slice(0,-1); updatePinDots(); }
+function pinClear(){ pinBuffer=''; updatePinDots(); document.getElementById('pin-err').textContent=''; }
+function updatePinDots(n){
+  for(let i=0;i<PIN_LEN;i++){
+    const d=document.getElementById('pd'+i);
+    d.classList.remove('filled','error');
+    if(i<pinBuffer.length) d.classList.add('filled');
+  }
+}
+function checkPin(){
+  if(pinBuffer===state.pin){
+    document.getElementById('lock-screen').style.display='none';
+    document.getElementById('lock-header-btn').style.display='';
+    document.getElementById('pin-err').textContent='';
+    pinBuffer='';
+    updatePinDots();
+  } else {
+    // shake & error
+    for(let i=0;i<PIN_LEN;i++) document.getElementById('pd'+i).classList.add('error');
+    document.getElementById('pin-err').textContent='INCORRECT PIN';
+    setTimeout(()=>{ pinBuffer=''; updatePinDots(); document.getElementById('pin-err').textContent=''; },800);
+  }
+}
+function lockApp(){
+  pinBuffer='';
+  updatePinDots();
+  document.getElementById('pin-err').textContent='';
+  document.getElementById('lock-subtitle').textContent='ENTER ADMIN PIN';
+  document.getElementById('lock-screen').style.display='flex';
+}
+
+// ══════════════════════════════════════════════════
+//  CARGO OPERATIONS
+// ══════════════════════════════════════════════════
+function addCargoOp(){
+  const port=document.getElementById('co-port').value.trim(); if(!port) return;
+  state.cargo.ops.unshift({
+    id:uid(), port, type:document.getElementById('co-type').value,
+    cargo:document.getElementById('co-cargo').value, qty:+document.getElementById('co-qty').value||0,
+    api:document.getElementById('co-api').value, start:document.getElementById('co-start').value,
+    end:document.getElementById('co-end').value, berth:document.getElementById('co-berth').value,
+    charter:document.getElementById('co-charter').value, remarks:document.getElementById('co-rem').value,
+    added:today()
+  });
+  save(); renderCargo(); toast('CARGO OP SAVED','success'); toggleForm('cargo-op-form');
+  ['co-port','co-cargo','co-qty','co-api','co-start','co-end','co-berth','co-charter','co-rem'].forEach(id=>document.getElementById(id).value='');
+}
+function addSTS(){
+  const vessel=document.getElementById('sts-vessel').value.trim(); if(!vessel) return;
+  state.cargo.sts.unshift({
+    id:uid(), vessel, imo:document.getElementById('sts-imo').value,
+    type:document.getElementById('sts-type').value, cargo:document.getElementById('sts-cargo').value,
+    qty:+document.getElementById('sts-qty').value||0, loc:document.getElementById('sts-loc').value,
+    start:document.getElementById('sts-start').value, end:document.getElementById('sts-end').value,
+    mm:document.getElementById('sts-mm').value, remarks:document.getElementById('sts-rem').value,
+    added:today()
+  });
+  save(); renderCargo(); toast('STS OP SAVED','success'); toggleForm('cargo-sts-form');
+  ['sts-vessel','sts-imo','sts-cargo','sts-qty','sts-loc','sts-start','sts-end','sts-mm','sts-rem'].forEach(id=>document.getElementById(id).value='');
+}
+function deleteCargoOp(id,type){
+  if(type==='op') state.cargo.ops=state.cargo.ops.filter(x=>x.id!==id);
+  else state.cargo.sts=state.cargo.sts.filter(x=>x.id!==id);
+  save(); renderCargo(); toast('DELETED');
+}
+function clearCargoData(){
+  if(!confirm('Clear ALL cargo records?')) return;
+  state.cargo={ops:[],sts:[]};
+  save(); renderCargo(); toast('CLEARED','warn');
+}
+function fmtDT(s){
+  if(!s) return '—';
+  return s.replace('T',' ').slice(0,16);
+}
+function renderCargo(){
+  // Ops panel (last 10)
+  const ops=state.cargo.ops;
+  document.getElementById('cargo-op-count').textContent=`${ops.length} record${ops.length!==1?'s':''}`;
+  const opList=document.getElementById('cargo-op-list');
+  if(!ops.length){ opList.innerHTML='<div class="empty" style="padding:28px;">NO RECORDS YET</div>'; }
+  else{
+    opList.innerHTML=ops.slice(0,10).map(o=>{
+      const bc=o.type.includes('Load')?'load':o.type.includes('Disch')?'disch':'sts';
+      return`<div class="cargo-item">
+        <div class="cargo-item-top">
+          <span class="cargo-item-name">${escHtml(o.port)}</span>
+          <span class="cargo-badge ${bc}">${escHtml(o.type)}</span>
+        </div>
+        <div class="cargo-item-meta">${escHtml(o.cargo)} · ${o.qty?o.qty.toLocaleString()+' MT':''} ${o.api?'· API '+o.api:''}</div>
+        <div class="cargo-item-meta">${fmtDT(o.start)} → ${fmtDT(o.end)}</div>
+        ${o.berth?`<div class="cargo-item-meta">${escHtml(o.berth)}${o.charter?' · '+escHtml(o.charter):''}</div>`:''}
+      </div>`;
+    }).join('');
+  }
+  // STS panel (last 10)
+  const sts=state.cargo.sts;
+  document.getElementById('cargo-sts-count').textContent=`${sts.length} record${sts.length!==1?'s':''}`;
+  const stsList=document.getElementById('cargo-sts-list');
+  if(!sts.length){ stsList.innerHTML='<div class="empty" style="padding:28px;">NO RECORDS YET</div>'; }
+  else{
+    stsList.innerHTML=sts.slice(0,10).map(s=>{
+      const dir=s.type.includes('Give')?'↑ GIVE':'↓ RECV';
+      const dirCol=s.type.includes('Give')?'var(--danger)':'var(--accent2)';
+      return`<div class="cargo-item">
+        <div class="cargo-item-top">
+          <span class="cargo-item-name">${escHtml(s.vessel)}</span>
+          <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${dirCol};">${dir}</span>
+        </div>
+        <div class="cargo-item-meta">IMO ${escHtml(s.imo||'?')} · ${escHtml(s.loc)}</div>
+        <div class="cargo-item-meta">${escHtml(s.cargo)} · ${s.qty?s.qty.toLocaleString()+' MT':''}</div>
+        <div class="cargo-item-meta">${fmtDT(s.start)} → ${fmtDT(s.end)}</div>
+      </div>`;
+    }).join('');
+  }
+  // All records table
+  const allRecords=[
+    ...state.cargo.ops.map(o=>({...o,_cat:'CARGO'})),
+    ...state.cargo.sts.map(s=>({...s,_cat:'STS',port:s.vessel+' ('+s.loc+')'}))
+  ].sort((a,b)=>b.added.localeCompare(a.added));
+  const tbody=document.getElementById('cargo-all-tbody');
+  if(!allRecords.length){ tbody.innerHTML='<tr><td colspan="9" class="empty">NO RECORDS</td></tr>'; return; }
+  tbody.innerHTML=allRecords.map((r,i)=>{
+    const bc=r._cat==='STS'?'sts':r.type&&r.type.includes('Load')?'load':'disch';
+    return`<tr>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${i+1}</td>
+      <td><span class="cargo-badge ${bc}">${r._cat==='STS'?'STS':escHtml(r.type)}</span></td>
+      <td style="font-weight:500;">${escHtml(r.port||'')}</td>
+      <td style="color:var(--text2);font-size:12px;">${escHtml(r.cargo||'')}</td>
+      <td style="font-family:var(--mono);">${r.qty?r.qty.toLocaleString():''}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text2);">${fmtDT(r.start)}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text2);">${fmtDT(r.end)}</td>
+      <td style="font-size:12px;color:var(--text2);">${escHtml(r.remarks||'')}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteCargoOp('${r.id}','${r._cat==='STS'?'sts':'op'}')">DEL</button></td>
+    </tr>`;
+  }).join('');
+}
+function updateClock(){
+  const t=new Date().toISOString().split('T')[1].split('.')[0];
+  document.getElementById('clock').textContent='UTC '+t;
+  document.getElementById('dash-date').textContent=new Date().toISOString().split('T')[0];
+}
+setInterval(updateClock,1000);updateClock();
+
+function updateHeader(){
+  const v=state.vessel;
+  document.getElementById('hdr-vname').textContent=v.name||'M/T VESSEL NAME';
+  document.getElementById('hdr-imo').textContent=`IMO ${v.imo||'???????'} · MMSI ${v.mmsi||'?????????'}`;
+}
+
+// ══════════════════════════════════════════════════
+//  VESSEL SETTINGS
+// ══════════════════════════════════════════════════
+function openSettings(){
+  const v=state.vessel;
+  document.getElementById('vs-name').value=v.name||'';
+  document.getElementById('vs-imo').value=v.imo||'';
+  document.getElementById('vs-mmsi').value=v.mmsi||'';
+  document.getElementById('vs-call').value=v.callsign||'';
+  document.getElementById('vs-flag').value=v.flag||'';
+  document.getElementById('vs-dwt').value=v.dwt||'';
+  document.getElementById('vs-year').value=v.year||'';
+  document.getElementById('vs-owner').value=v.owner||'';
+  document.getElementById('vs-officer').value=v.officer||'';
+  document.getElementById('settings-modal').style.display='flex';
+}
+function closeSettings(){ document.getElementById('settings-modal').style.display='none'; }
+function saveSettings(){
+  // Handle PIN change
+  const np=document.getElementById('vs-pin-new').value.trim();
+  const cp=document.getElementById('vs-pin-confirm').value.trim();
+  if(np){
+    if(!/^\d{4}$/.test(np)){toast('PIN must be exactly 4 digits','error');return;}
+    if(np!==cp){toast('PINs do not match','error');return;}
+    state.pin=np;
+  }
+  state.vessel={
+    name:  document.getElementById('vs-name').value.trim()||'M/T VESSEL NAME',
+    imo:   document.getElementById('vs-imo').value.trim()||'0000000',
+    mmsi:  document.getElementById('vs-mmsi').value.trim()||'000000000',
+    callsign:document.getElementById('vs-call').value.trim(),
+    flag:  document.getElementById('vs-flag').value.trim(),
+    dwt:   document.getElementById('vs-dwt').value.trim(),
+    year:  document.getElementById('vs-year').value.trim(),
+    owner: document.getElementById('vs-owner').value.trim(),
+    officer:document.getElementById('vs-officer').value.trim()
+  };
+  document.getElementById('vs-pin-new').value='';
+  document.getElementById('vs-pin-confirm').value='';
+  save(); updateHeader(); closeSettings(); toast('SETTINGS SAVED','success');
+}
+
+// ══════════════════════════════════════════════════
+//  TABS + UTILS
+// ══════════════════════════════════════════════════
+function showTab(id,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(id==='dashboard')renderDashboard();
+  if(id==='usagelog')renderLog();
+  if(id==='cargo')renderCargo();
+}
+function toggleForm(id){const el=document.getElementById(id);el.style.display=el.style.display==='none'?'block':'none';}
+function toast(msg='SAVED',type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='';if(type)t.classList.add(type);t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400);}
+function daysUntil(d){if(!d)return null;return Math.floor((new Date(d)-new Date())/86400000);}
+function dateClass(d){if(d===null)return '';if(d<0)return 'expired';if(d<30)return 'expiring';return 'ok';}
+function filterTable(id,q){document.getElementById(id).querySelectorAll('tr').forEach(r=>{r.style.display=r.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function today(){return new Date().toISOString().split('T')[0];}
+function clearData(type){
+  if(!confirm('Clear ALL data for this section?'))return;
+  if(type==='medical')state.medical=[];
+  else if(type==='stationery')state.stationery=[];
+  else state.navEquip=[];
+  save();renderMedical();renderStationery();renderNavEquip();toast('CLEARED','warn');
+}
+
+// ══════════════════════════════════════════════════
+//  QUICK USE — STOCK DEDUCTION
+// ══════════════════════════════════════════════════
+function openUseModal(type, id){
+  const item = type==='medical'
+    ? state.medical.find(x=>x.id===id)
+    : state.stationery.find(x=>x.id===id);
+  if(!item)return;
+  useCtx={type,id,name:item.name,stock:item.qty,unit:item.unit};
+  document.getElementById('use-item-name').textContent=item.name;
+  document.getElementById('use-stock-val').textContent=item.qty;
+  document.getElementById('use-stock-unit').textContent=item.unit||'';
+  document.getElementById('use-qty-input').value=1;
+  document.getElementById('use-qty-input').max=item.qty;
+  document.getElementById('use-reason').value='';
+  document.getElementById('use-modal').style.display='flex';
+}
+function closeUseModal(){ document.getElementById('use-modal').style.display='none'; }
+function adjustUseQty(d){
+  const inp=document.getElementById('use-qty-input');
+  let v=parseInt(inp.value)||1;
+  v=Math.max(1,Math.min(useCtx.stock,v+d));
+  inp.value=v;
+}
+function confirmUse(){
+  const qty=parseInt(document.getElementById('use-qty-input').value)||1;
+  if(qty<1){toast('Quantity must be ≥ 1','error');return;}
+  const reason=document.getElementById('use-reason').value.trim();
+  const type=useCtx.type;
+
+  // deduct stock
+  if(type==='medical'){
+    const idx=state.medical.findIndex(x=>x.id===useCtx.id);
+    if(idx<0)return;
+    const newQty=Math.max(0, state.medical[idx].qty - qty);
+    state.medical[idx].qty=newQty;
+  } else {
+    const idx=state.stationery.findIndex(x=>x.id===useCtx.id);
+    if(idx<0)return;
+    const newQty=Math.max(0, state.stationery[idx].qty - qty);
+    state.stationery[idx].qty=newQty;
+    state.stationery[idx].updated=today();
+  }
+
+  // log entry
+  state.usageLog.unshift({
+    id:uid(),
+    ts: new Date().toISOString(),
+    category: type,
+    itemId: useCtx.id,
+    itemName: useCtx.name,
+    unit: useCtx.unit,
+    qtyUsed: qty,
+    remaining: Math.max(0, useCtx.stock - qty),
+    reason: reason
+  });
+
+  save();
+  if(type==='medical')renderMedical();
+  else renderStationery();
+  closeUseModal();
+  toast(`−${qty} ${useCtx.unit} deducted`,'warn');
+}
+
+// ══════════════════════════════════════════════════
+//  USAGE LOG
+// ══════════════════════════════════════════════════
+function filterLog(f,btn){
+  logFilter=f;
+  document.querySelectorAll('.log-filter button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLog();
+}
+function clearLog(){
+  if(!confirm('Clear entire usage log?'))return;
+  state.usageLog=[];
+  save();renderLog();toast('LOG CLEARED','warn');
+}
+function renderLog(){
+  const tbody=document.getElementById('log-tbody');
+  const filtered=state.usageLog.filter(l=>logFilter==='all'||l.category===logFilter);
+  if(!filtered.length){tbody.innerHTML='<tr><td colspan="7" class="empty">NO USAGE RECORDED YET</td></tr>';return;}
+  tbody.innerHTML=filtered.map((l,i)=>{
+    const d=new Date(l.ts);
+    const ds=d.toISOString().split('T')[0]+' '+d.toISOString().split('T')[1].slice(0,5);
+    const catBadge=l.category==='medical'
+      ?'<span class="badge due">MED</span>'
+      :'<span style="font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;background:rgba(0,255,157,.1);color:var(--accent2);border:1px solid var(--accent2);">STAT</span>';
+    return `<tr>
+      <td style="color:var(--text3);font-family:var(--mono);font-size:11px;">${i+1}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text2);">${ds}</td>
+      <td>${catBadge}</td>
+      <td style="font-weight:500;">${escHtml(l.itemName)}</td>
+      <td style="font-family:var(--mono);color:var(--danger);">−${l.qtyUsed} ${escHtml(l.unit)}</td>
+      <td style="font-family:var(--mono);color:var(--accent2);">${l.remaining} ${escHtml(l.unit)}</td>
+      <td style="color:var(--text2);font-size:12px;">${escHtml(l.reason||'—')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  MEDICAL
+// ══════════════════════════════════════════════════
+function addMedItem(){
+  const name=document.getElementById('m-name').value.trim();if(!name)return;
+  state.medical.push({id:uid(),name,cat:document.getElementById('m-cat').value,qty:+document.getElementById('m-qty').value||0,unit:document.getElementById('m-unit').value,min:+document.getElementById('m-min').value||0,exp:document.getElementById('m-exp').value,loc:document.getElementById('m-loc').value,added:today()});
+  save();renderMedical();toast();toggleForm('med-form');
+  ['m-name','m-qty','m-unit','m-min','m-exp','m-loc'].forEach(id=>document.getElementById(id).value='');
+}
+function deleteMedItem(id){state.medical=state.medical.filter(x=>x.id!==id);save();renderMedical();toast('DELETED');}
+function renderMedical(){
+  const tbody=document.getElementById('med-tbody');
+  document.getElementById('med-count').textContent=state.medical.length;
+  if(!state.medical.length){tbody.innerHTML='<tr><td colspan="9" class="empty">NO ITEMS</td></tr>';return;}
+  tbody.innerHTML=state.medical.map((m,i)=>{
+    const d=daysUntil(m.exp),cls=dateClass(d);
+    const low=m.qty<=m.min&&m.min>0;
+    const st=d!==null&&d<0?'<span class="badge exp">EXPIRED</span>':d!==null&&d<30?`<span class="badge low">EXP ${d}d</span>`:low?'<span class="badge low">LOW</span>':'<span class="ok" style="font-family:var(--mono);font-size:11px;">OK</span>';
+    return `<tr>
+      <td style="color:var(--text3);font-family:var(--mono);font-size:11px;">${i+1}</td>
+      <td style="font-weight:500;">${escHtml(m.name)}</td>
+      <td style="color:var(--text2);font-size:12px;">${escHtml(m.cat)}</td>
+      <td style="font-family:var(--mono);">${m.qty} <span style="color:var(--text3);font-size:11px;">${escHtml(m.unit)}</span></td>
+      <td style="font-family:var(--mono);color:var(--text3);">${m.min}</td>
+      <td class="${cls}" style="font-family:var(--mono);font-size:12px;">${m.exp||'—'}</td>
+      <td style="color:var(--text2);font-size:12px;">${escHtml(m.loc)}</td>
+      <td>${st}</td>
+      <td style="display:flex;gap:5px;">
+        <button class="btn btn-warn btn-sm" onclick="openUseModal('medical','${m.id}')">USE</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMedItem('${m.id}')">DEL</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  STATIONERY
+// ══════════════════════════════════════════════════
+function addStatItem(){
+  const name=document.getElementById('s-name').value.trim();if(!name)return;
+  state.stationery.push({id:uid(),name,cat:document.getElementById('s-cat').value,qty:+document.getElementById('s-qty').value||0,unit:document.getElementById('s-unit').value,min:+document.getElementById('s-min').value||0,loc:document.getElementById('s-loc').value,updated:today()});
+  save();renderStationery();toast();toggleForm('stat-form');
+  ['s-name','s-qty','s-unit','s-min','s-loc'].forEach(id=>document.getElementById(id).value='');
+}
+function deleteStatItem(id){state.stationery=state.stationery.filter(x=>x.id!==id);save();renderStationery();toast('DELETED');}
+function renderStationery(){
+  const tbody=document.getElementById('stat-tbody');
+  document.getElementById('stat-count').textContent=state.stationery.length;
+  if(!state.stationery.length){tbody.innerHTML='<tr><td colspan="9" class="empty">NO ITEMS</td></tr>';return;}
+  tbody.innerHTML=state.stationery.map((s,i)=>{
+    const low=s.qty<=s.min&&s.min>0;
+    const st=low?'<span class="badge low">LOW</span>':'<span class="ok" style="font-family:var(--mono);font-size:11px;">OK</span>';
+    return `<tr>
+      <td style="color:var(--text3);font-family:var(--mono);font-size:11px;">${i+1}</td>
+      <td style="font-weight:500;">${escHtml(s.name)}</td>
+      <td style="color:var(--text2);font-size:12px;">${escHtml(s.cat)}</td>
+      <td style="font-family:var(--mono);">${s.qty} <span style="color:var(--text3);font-size:11px;">${escHtml(s.unit)}</span></td>
+      <td style="font-family:var(--mono);color:var(--text3);">${s.min}</td>
+      <td style="color:var(--text2);font-size:12px;">${escHtml(s.loc)}</td>
+      <td>${st}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${s.updated}</td>
+      <td style="display:flex;gap:5px;">
+        <button class="btn btn-warn btn-sm" onclick="openUseModal('stationery','${s.id}')">USE</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStatItem('${s.id}')">DEL</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  NAV EQUIP
+// ══════════════════════════════════════════════════
+function addNavItem(){
+  const name=document.getElementById('n-name').value.trim();if(!name)return;
+  state.navEquip.push({id:uid(),name,type:document.getElementById('n-type').value,maker:document.getElementById('n-maker').value,last:document.getElementById('n-last').value,next:document.getElementById('n-next').value,interval:+document.getElementById('n-interval').value||365,remarks:document.getElementById('n-rem').value});
+  save();renderNavEquip();toast();toggleForm('nav-form');
+  ['n-name','n-maker','n-last','n-next','n-interval','n-rem'].forEach(id=>document.getElementById(id).value='');
+}
+function deleteNavItem(id){state.navEquip=state.navEquip.filter(x=>x.id!==id);save();renderNavEquip();toast('DELETED');}
+function renderNavEquip(){
+  const tbody=document.getElementById('nav-tbody');
+  document.getElementById('nav-count').textContent=state.navEquip.length;
+  if(!state.navEquip.length){tbody.innerHTML='<tr><td colspan="9" class="empty">NO EQUIPMENT</td></tr>';return;}
+  tbody.innerHTML=state.navEquip.map((n,i)=>{
+    const d=daysUntil(n.next),cls=dateClass(d);
+    const dl=d===null?'—':d<0?`<span class="expired">OD ${Math.abs(d)}d</span>`:d<14?`<span class="expiring">${d}d</span>`:`<span class="ok">${d}d</span>`;
+    return `<tr>
+      <td style="color:var(--text3);font-family:var(--mono);font-size:11px;">${i+1}</td>
+      <td style="font-weight:500;">${escHtml(n.name)}</td>
+      <td style="color:var(--text2);font-size:12px;">${escHtml(n.type)}</td>
+      <td style="font-size:12px;color:var(--text2);">${escHtml(n.maker)}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${n.last||'—'}</td>
+      <td class="${cls}" style="font-family:var(--mono);font-size:12px;">${n.next||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px;">${dl}</td>
+      <td style="font-size:12px;color:var(--text2);">${escHtml(n.remarks)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteNavItem('${n.id}')">DEL</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  NOTES
+// ══════════════════════════════════════════════════
+function addNote(){
+  const body=document.getElementById('note-body').value.trim();if(!body)return;
+  state.notes.unshift({id:uid(),body,tag:document.getElementById('note-tag').value,ts:new Date().toISOString()});
+  document.getElementById('note-body').value='';
+  save();renderNotes();toast();
+}
+function deleteNote(id){state.notes=state.notes.filter(x=>x.id!==id);save();renderNotes();toast('DELETED');}
+function renderNotes(){
+  const grid=document.getElementById('notes-grid');
+  if(!state.notes.length){grid.innerHTML='<div class="empty" style="grid-column:1/-1">NO NOTES YET</div>';return;}
+  grid.innerHTML=state.notes.map(n=>{
+    const d=new Date(n.ts);
+    const ds=d.toISOString().split('T')[0]+' '+d.toISOString().split('T')[1].slice(0,5)+' UTC';
+    const ts={URGENT:'color:var(--danger);border-color:var(--danger);background:rgba(255,59,59,.1);',DEFECT:'color:var(--warn);border-color:var(--warn);background:rgba(255,179,0,.1);'}[n.tag]||'';
+    return `<div class="note-card"><button class="note-del" onclick="deleteNote('${n.id}')">✕</button><div class="note-meta">${ds}</div><div class="note-body">${escHtml(n.body)}</div><span class="note-tag" style="${ts}">${n.tag}</span></div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════════
+function renderDashboard(){
+  const me=state.medical.filter(m=>{const d=daysUntil(m.exp);return d!==null&&d<0;}).length;
+  const mx=state.medical.filter(m=>{const d=daysUntil(m.exp);return d!==null&&d>=0&&d<30;}).length;
+  const ml=state.medical.filter(m=>m.qty<=m.min&&m.min>0).length;
+  const sl=state.stationery.filter(s=>s.qty<=s.min&&s.min>0).length;
+  const no=state.navEquip.filter(n=>{const d=daysUntil(n.next);return d!==null&&d<0;}).length;
+  const ns=state.navEquip.filter(n=>{const d=daysUntil(n.next);return d!==null&&d>=0&&d<14;}).length;
+  const cardStyle='cursor:pointer;transition:transform .15s,box-shadow .15s;';
+  const cardHover='onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 4px 20px rgba(0,200,255,.12)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'"';
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat-card cyan" style="${cardStyle}" ${cardHover} onclick="navTo('medical')"><div class="stat-label">Medical Items</div><div class="stat-value">${state.medical.length}</div><div class="stat-sub">${ml} low · ${mx} expiring soon</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;letter-spacing:1px;">CLICK TO VIEW →</div></div>
+    <div class="stat-card ${me>0?'danger':'green'}" style="${cardStyle}" ${cardHover} onclick="navTo('medical')"><div class="stat-label">Expired Medicines</div><div class="stat-value">${me}</div><div class="stat-sub">${me>0?'⚠ ACTION REQUIRED':'All within date'}</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;letter-spacing:1px;">CLICK TO VIEW →</div></div>
+    <div class="stat-card green" style="${cardStyle}" ${cardHover} onclick="navTo('stationery')"><div class="stat-label">Stationery Items</div><div class="stat-value">${state.stationery.length}</div><div class="stat-sub">${sl} below minimum</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;letter-spacing:1px;">CLICK TO VIEW →</div></div>
+    <div class="stat-card ${no>0?'danger':ns>0?'warn':'cyan'}" style="${cardStyle}" ${cardHover} onclick="navTo('navequip')"><div class="stat-label">Nav Equip Alerts</div><div class="stat-value">${no+ns}</div><div class="stat-sub">${no} overdue · ${ns} within 14d</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;letter-spacing:1px;">CLICK TO VIEW →</div></div>
+    <div class="stat-card cyan" style="${cardStyle}" ${cardHover} onclick="navTo('navequip')"><div class="stat-label">Nav Equipment</div><div class="stat-value">${state.navEquip.length}</div><div class="stat-sub">Tracked in system</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;letter-spacing:1px;">CLICK TO VIEW →</div></div>
+    <div class="stat-card green" style="${cardStyle}" ${cardHover} onclick="navTo('usagelog')"><div class="stat-label">Usage Log</div><div class="stat-value">${state.usageLog.length}</div><div class="stat-sub">Total transactions</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;letter-spacing:1px;">CLICK TO VIEW →</div></div>
+    <div class="stat-card warn" style="${cardStyle}" ${cardHover} onclick="navTo('cargo')"><div class="stat-label">Cargo Operations</div><div class="stat-value">${state.cargo.ops.length}</div><div class="stat-sub">${state.cargo.sts.length} STS recorded</div><div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:8px;letter-spacing:1px;">CLICK TO VIEW →</div></div>
+  `;
+  const alerts=[];
+  state.medical.forEach(m=>{const d=daysUntil(m.exp);if(d!==null&&d<0)alerts.push({t:'exp',msg:`${m.name} — EXPIRED (${m.exp})`});else if(d!==null&&d<30)alerts.push({t:'low',msg:`${m.name} — Expires in ${d} days`});if(m.qty<=m.min&&m.min>0)alerts.push({t:'low',msg:`${m.name} — Low stock (${m.qty} ${m.unit})`});});
+  state.stationery.forEach(s=>{if(s.qty<=s.min&&s.min>0)alerts.push({t:'low',msg:`${s.name} — Low stock (${s.qty} ${s.unit})`});});
+  state.navEquip.forEach(n=>{const d=daysUntil(n.next);if(d!==null&&d<0)alerts.push({t:'exp',msg:`${n.name} — Maintenance OVERDUE ${Math.abs(d)}d`});else if(d!==null&&d<14)alerts.push({t:'due',msg:`${n.name} — Due in ${d} days`});});
+  document.getElementById('dash-alerts').innerHTML=alerts.length===0
+    ?`<div class="alert-box" style="border-left-color:var(--accent2);"><div class="alert-title" style="color:var(--accent2);">✓ ALL SYSTEMS NOMINAL</div><div style="font-size:13px;color:var(--text2);">No active alerts.</div></div>`
+    :`<div class="alert-box"><div class="alert-title">⚠ ACTIVE ALERTS (${alerts.length})</div>${alerts.map(a=>`<div class="alert-item"><span class="badge ${a.t}">${a.t.toUpperCase()}</span><span>${escHtml(a.msg)}</span></div>`).join('')}</div>`;
+}
+
+// ══════════════════════════════════════════════════
+//  EXPORT EXCEL
+// ══════════════════════════════════════════════════
+function buildMedRows(){ return [['Item Name','Category','Qty','Unit','Min Stock','Expiry Date','Location','Status'],...state.medical.map(m=>{const d=daysUntil(m.exp);const st=d!==null&&d<0?'EXPIRED':d!==null&&d<30?`Exp in ${d}d`:m.qty<=m.min&&m.min>0?'LOW STOCK':'OK';return[m.name,m.cat,m.qty,m.unit,m.min,m.exp||'',m.loc,st];})]; }
+function buildStatRows(){ return [['Item Name','Category','Qty','Unit','Min Stock','Location','Status','Last Updated'],...state.stationery.map(s=>[s.name,s.cat,s.qty,s.unit,s.min,s.loc,s.qty<=s.min&&s.min>0?'LOW STOCK':'OK',s.updated||''])]; }
+function buildNavRows(){ return [['Equipment','Type','Maker/Model','Last Maint.','Next Due','Interval(days)','Days Left','Remarks'],...state.navEquip.map(n=>{const d=daysUntil(n.next);return[n.name,n.type,n.maker,n.last||'',n.next||'',n.interval,d!==null?d:'N/A',n.remarks];})]; }
+function buildLogRows(){ return [['Date/Time','Category','Item','Qty Used','Unit','Remaining','Reason'],...state.usageLog.map(l=>[l.ts.replace('T',' ').slice(0,16),l.category,l.itemName,l.qtyUsed,l.unit,l.remaining,l.reason||''])]; }
+
+function addSheetWithInfo(wb, rows, sheetName){
+  const v=state.vessel;
+  const infoRows=[
+    ['Vessel:',v.name,'IMO:',v.imo,'MMSI:',v.mmsi],
+    ['Flag:',v.flag,'Call Sign:',v.callsign,'Officer:',v.officer],
+    ['Export Date:',new Date().toISOString().split('T')[0],'','','',''],
+    []
+  ];
+  const ws=XLSX.utils.aoa_to_sheet([...infoRows,...rows]);
+  ws['!cols']=Array(8).fill({wch:20});
+  XLSX.utils.book_append_sheet(wb,ws,sheetName);
+}
+
+function exportSection(type){
+  const wb=XLSX.utils.book_new();
+  const v=state.vessel;
+  if(type==='medical')    addSheetWithInfo(wb,buildMedRows(),'Medical Store');
+  else if(type==='stationery') addSheetWithInfo(wb,buildStatRows(),'Stationery');
+  else if(type==='navequip')   addSheetWithInfo(wb,buildNavRows(),'Nav Equipment');
+  else if(type==='log')        addSheetWithInfo(wb,buildLogRows(),'Usage Log');
+  else if(type==='cargo'){
+    const opRows=[['Port','Op Type','Cargo','Qty(MT)','API','Berth','Charterer','Commenced','Completed','Remarks'],
+      ...state.cargo.ops.map(o=>[o.port,o.type,o.cargo,o.qty,o.api,o.berth,o.charter,fmtDT(o.start),fmtDT(o.end),o.remarks])];
+    const stsRows=[['Other Vessel','IMO','Type','Cargo','Qty(MT)','Location','Mooring Master','Commenced','Completed','Remarks'],
+      ...state.cargo.sts.map(s=>[s.vessel,s.imo,s.type,s.cargo,s.qty,s.loc,s.mm,fmtDT(s.start),fmtDT(s.end),s.remarks])];
+    addSheetWithInfo(wb,opRows,'Cargo Operations');
+    addSheetWithInfo(wb,stsRows,'STS Operations');
+  }
+  const fname=`${v.name.replace(/[^a-zA-Z0-9]/g,'_')}_${type}_${today()}.xlsx`;
+  XLSX.writeFile(wb,fname);
+  toast('EXPORTED','success');
+}
+
+function exportAll(){
+  const wb=XLSX.utils.book_new();
+  addSheetWithInfo(wb,buildMedRows(),'Medical Store');
+  addSheetWithInfo(wb,buildStatRows(),'Stationery');
+  addSheetWithInfo(wb,buildNavRows(),'Nav Equipment');
+  addSheetWithInfo(wb,buildLogRows(),'Usage Log');
+  const opRows=[['Port','Op Type','Cargo','Qty(MT)','API','Berth','Charterer','Commenced','Completed','Remarks'],
+    ...state.cargo.ops.map(o=>[o.port,o.type,o.cargo,o.qty,o.api,o.berth,o.charter,fmtDT(o.start),fmtDT(o.end),o.remarks])];
+  const stsRows=[['Other Vessel','IMO','Type','Cargo','Qty(MT)','Location','Mooring Master','Commenced','Completed','Remarks'],
+    ...state.cargo.sts.map(s=>[s.vessel,s.imo,s.type,s.cargo,s.qty,s.loc,s.mm,fmtDT(s.start),fmtDT(s.end),s.remarks])];
+  addSheetWithInfo(wb,opRows,'Cargo Operations');
+  addSheetWithInfo(wb,stsRows,'STS Operations');
+  const v=state.vessel;
+  const vws=XLSX.utils.aoa_to_sheet([
+    ['Field','Value'],
+    ['Vessel Name',v.name],['IMO',v.imo],['MMSI',v.mmsi],
+    ['Call Sign',v.callsign],['Flag',v.flag],['DWT',v.dwt],
+    ['Build Year',v.year],['Owner/Manager',v.owner],['Officer',v.officer]
+  ]);
+  XLSX.utils.book_append_sheet(wb,vws,'Vessel Info');
+  const fname=`${v.name.replace(/[^a-zA-Z0-9]/g,'_')}_SecondBrain_${today()}.xlsx`;
+  XLSX.writeFile(wb,fname);
+  toast('ALL DATA EXPORTED','success');
+}
+
+// ══════════════════════════════════════════════════
+//  IMPORT
+// ══════════════════════════════════════════════════
+const FIELDS={
+  medical:[{key:'name',label:'Item Name',req:true},{key:'cat',label:'Category'},{key:'qty',label:'Quantity'},{key:'unit',label:'Unit'},{key:'min',label:'Min Stock'},{key:'exp',label:'Expiry Date'},{key:'loc',label:'Location'}],
+  stationery:[{key:'name',label:'Item Name',req:true},{key:'cat',label:'Category'},{key:'qty',label:'Quantity'},{key:'unit',label:'Unit'},{key:'min',label:'Min Stock'},{key:'loc',label:'Location'}],
+  navequip:[{key:'name',label:'Equipment Name',req:true},{key:'type',label:'Type'},{key:'maker',label:'Maker/Model'},{key:'last',label:'Last Maintenance'},{key:'next',label:'Next Due'},{key:'interval',label:'Interval (days)'},{key:'remarks',label:'Remarks'}],
+  cargo_ops:[
+    {key:'port',  label:'Port / Location', req:true},
+    {key:'type',  label:'Operation Type'},
+    {key:'cargo', label:'Cargo Type'},
+    {key:'qty',   label:'Quantity (MT)'},
+    {key:'api',   label:'API Gravity'},
+    {key:'berth', label:'Terminal / Berth'},
+    {key:'charter',label:'Charterer'},
+    {key:'start', label:'Commenced (UTC)'},
+    {key:'end',   label:'Completed (UTC)'},
+    {key:'remarks',label:'Remarks'}
+  ],
+  cargo_sts:[
+    {key:'vessel',label:'Other Vessel', req:true},
+    {key:'imo',   label:'IMO (Other Vessel)'},
+    {key:'type',  label:'STS Type'},
+    {key:'cargo', label:'Cargo'},
+    {key:'qty',   label:'Quantity (MT)'},
+    {key:'loc',   label:'Location / Area'},
+    {key:'start', label:'Commenced (UTC)'},
+    {key:'end',   label:'Completed (UTC)'},
+    {key:'mm',    label:'Mooring Master'},
+    {key:'remarks',label:'Remarks'}
+  ]
+};
+const TMPL_HDR={
+  medical:['Item Name','Category','Quantity','Unit','Min Stock','Expiry Date (YYYY-MM-DD)','Location'],
+  stationery:['Item Name','Category','Quantity','Unit','Min Stock','Location'],
+  navequip:['Equipment Name','Type','Maker/Model','Last Maintenance (YYYY-MM-DD)','Next Due (YYYY-MM-DD)','Interval (days)','Remarks'],
+  cargo_ops:['Port / Location','Operation Type','Cargo Type','Quantity (MT)','API Gravity','Terminal / Berth','Charterer','Commenced UTC (YYYY-MM-DD HH:MM)','Completed UTC (YYYY-MM-DD HH:MM)','Remarks'],
+  cargo_sts:['Other Vessel Name','IMO (Other)','STS Type (Give/Receive)','Cargo','Quantity (MT)','Location / Area','Commenced UTC (YYYY-MM-DD HH:MM)','Completed UTC (YYYY-MM-DD HH:MM)','Mooring Master','Remarks']
+};
+const TMPL_SAMPLE={
+  medical:[['Paracetamol 500mg','Analgesic','100','tabs','20','2026-12-31','Cabinet A-1'],['Amoxicillin 250mg','Antibiotic','50','caps','10','2025-08-15','Cabinet A-2']],
+  stationery:[['A4 Paper','Paper / Forms','10','reams','2','Chart Room'],['Ballpen (Black)','Writing','30','pcs','5','Office Drawer']],
+  navequip:[['Gyrocompass (Main)','Compass','JRC CR-100','2025-01-10','2026-01-10','365','Good'],['RADAR (S-Band)','RADAR','Furuno FAR-2127','2025-03-01','2026-03-01','365','Annual cal due']],
+  cargo_ops:[
+    ['Ras Tanura, KSA','Loading','Arabian Light Crude','280000','34.5','Berth No.4','Shell Trading','2025-03-01 06:00','2025-03-02 14:30','All clear, no issues'],
+    ['Ulsan, Korea','Discharging','Arabian Light Crude','280000','34.5','SPM Buoy 2','Hyundai Oil','2025-03-06 08:00','2025-03-07 20:00','Minor delay due to weather']
+  ],
+  cargo_sts:[
+    ['M/T PACIFIC RUBY','9123456','Ship-to-Ship Transfer (Give)','Arabian Light Crude','120000','Hormuz Anchorage','2025-04-10 10:00','2025-04-11 04:00','Capt. Ahmad / STS Marine','Good conditions, no issues'],
+    ['M/T GULF TRADER','9654321','Ship-to-Ship Transfer (Receive)','Basra Heavy','80000','Fujairah Outer Anchorage','2025-04-20 08:00','2025-04-20 22:00','Capt. Lee / Pacific STS','Slight swell 1.0m']
+  ]
+};
+function dlTemplate(type){
+  const wb=XLSX.utils.book_new();
+  if(type==='cargo_ops'){
+    // Two-sheet workbook: Cargo Ops + instructions
+    const ws=XLSX.utils.aoa_to_sheet([TMPL_HDR[type],...TMPL_SAMPLE[type]]);
+    ws['!cols']=TMPL_HDR[type].map(()=>({wch:26}));
+    XLSX.utils.book_append_sheet(wb,ws,'Cargo Operations');
+    const instr=XLSX.utils.aoa_to_sheet([
+      ['INSTRUCTIONS'],[''],
+      ['Operation Type options:','Loading, Discharging, Part Load, Part Discharge, Shifting'],
+      ['Date format:','YYYY-MM-DD HH:MM  e.g. 2025-03-01 06:00'],
+      ['Quantity:','Metric Tonnes (MT)'],
+    ]);
+    XLSX.utils.book_append_sheet(wb,instr,'Instructions');
+    XLSX.writeFile(wb,'2ndOff_cargo_ops_template.xlsx');
+  } else if(type==='cargo_sts'){
+    const ws=XLSX.utils.aoa_to_sheet([TMPL_HDR[type],...TMPL_SAMPLE[type]]);
+    ws['!cols']=TMPL_HDR[type].map(()=>({wch:26}));
+    XLSX.utils.book_append_sheet(wb,ws,'STS Operations');
+    const instr=XLSX.utils.aoa_to_sheet([
+      ['INSTRUCTIONS'],[''],
+      ['STS Type options:','Ship-to-Ship Transfer (Give)   or   Ship-to-Ship Transfer (Receive)'],
+      ['Date format:','YYYY-MM-DD HH:MM  e.g. 2025-04-10 10:00'],
+      ['Quantity:','Metric Tonnes (MT)'],
+    ]);
+    XLSX.utils.book_append_sheet(wb,instr,'Instructions');
+    XLSX.writeFile(wb,'2ndOff_cargo_sts_template.xlsx');
+  } else {
+    const ws=XLSX.utils.aoa_to_sheet([TMPL_HDR[type],...TMPL_SAMPLE[type]]);
+    ws['!cols']=TMPL_HDR[type].map(()=>({wch:22}));
+    XLSX.utils.book_append_sheet(wb,ws,type.charAt(0).toUpperCase()+type.slice(1));
+    XLSX.writeFile(wb,`2ndOff_${type}_template.xlsx`);
+  }
+  toast('TEMPLATE DOWNLOADED','success');
+}
+function openImport(type){
+  importCtx={type,wb:null,sheets:[],parsedRows:[],mapping:{}};
+  const titles={
+    medical:'⚕ Import Medical',
+    stationery:'📦 Import Stationery',
+    navequip:'🧭 Import Nav Equipment',
+    cargo_ops:'⚓ Import Cargo Operations',
+    cargo_sts:'🔄 Import STS Operations'
+  };
+  document.getElementById('modal-title').textContent=titles[type]||'Import';
+  renderImportStep1();
+  document.getElementById('import-modal').style.display='flex';
+}
+function closeImport(){document.getElementById('import-modal').style.display='none';}
+function renderImportStep1(){
+  document.getElementById('modal-body').innerHTML=`
+    <div class="import-steps"><div class="imp-step active">1 · UPLOAD</div><div class="imp-step">2 · MAP</div><div class="imp-step">3 · CONFIRM</div></div>
+    <div class="template-box"><div class="template-box-title">💡 Download template first if needed</div><button class="btn btn-outline btn-sm" onclick="dlTemplate('${importCtx.type}')">⬇ Download Template</button></div>
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFile(event)">
+      <div class="drop-icon">📂</div>
+      <div class="drop-label">DROP FILE HERE</div>
+      <div class="drop-sub">.xlsx .xls .csv · click to browse</div>
+    </div>
+    <div id="file-status" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--text3);text-align:center;"></div>
+  `;
+  const dz=document.getElementById('drop-zone');
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');if(e.dataTransfer.files[0])processFile(e.dataTransfer.files[0]);});
+}
+function handleFile(e){if(e.target.files[0])processFile(e.target.files[0]);}
+function processFile(file){
+  document.getElementById('file-status').textContent=`Reading: ${file.name}…`;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      importCtx.wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+      importCtx.sheets=importCtx.wb.SheetNames;
+      document.getElementById('file-status').innerHTML=`<span style="color:var(--accent2);">✓ ${file.name} · ${importCtx.sheets.length} sheet(s)</span>`;
+      setTimeout(()=>renderImportStep2(),400);
+    }catch(err){document.getElementById('file-status').innerHTML=`<span style="color:var(--danger);">✗ ${err.message}</span>`;}
+  };
+  reader.readAsArrayBuffer(file);
+}
+function excelDateToStr(val){
+  if(!val)return '';
+  if(typeof val==='string'&&val.match(/^\d{4}-\d{2}-\d{2}/))return val.slice(0,10);
+  if(val instanceof Date)return val.toISOString().slice(0,10);
+  if(typeof val==='number'){return new Date(Math.round((val-25569)*86400*1000)).toISOString().slice(0,10);}
+  const m=String(val).match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+  if(m){let y=m[3];if(y.length===2)y='20'+y;return`${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;}
+  return String(val);
+}
+function renderImportStep2(){
+  const fields=FIELDS[importCtx.type];
+  let defSheet=importCtx.sheets[0];
+  importCtx.sheets.forEach(s=>{if(s.toLowerCase().includes(importCtx.type.toLowerCase()))defSheet=s;});
+  const parseSheet=name=>{
+    importCtx.parsedRows=XLSX.utils.sheet_to_json(importCtx.wb.Sheets[name],{header:1,defval:''});
+    renderMapper(importCtx.parsedRows);
+  };
+  document.getElementById('modal-body').innerHTML=`
+    <div class="import-steps"><div class="imp-step done">1 ✓</div><div class="imp-step active">2 · MAP</div><div class="imp-step">3 · CONFIRM</div></div>
+    <div class="sheet-picker"><label>Sheet</label><select id="sheet-sel" onchange="reparseSheet(this.value)">${importCtx.sheets.map(s=>`<option value="${escHtml(s)}"${s===defSheet?' selected':''}>${escHtml(s)}</option>`).join('')}</select></div>
+    <div id="mapper-wrap"></div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end;"><button class="btn btn-primary" id="next-btn" style="display:none;" onclick="renderImportStep3()">NEXT →</button></div>
+  `;
+  parseSheet(defSheet);
+}
+function reparseSheet(name){
+  importCtx.parsedRows=XLSX.utils.sheet_to_json(importCtx.wb.Sheets[name],{header:1,defval:''});
+  renderMapper(importCtx.parsedRows);
+}
+function renderMapper(rows){
+  const fields=FIELDS[importCtx.type];
+  if(!rows||rows.length<1){document.getElementById('mapper-wrap').innerHTML='<p style="color:var(--warn);margin-top:12px;font-size:13px;">Sheet is empty.</p>';return;}
+  const headers=rows[0].map(h=>String(h));
+  const opts=['(skip)',...headers.map((h,i)=>`${i+1}: ${h}`)];
+  const auto={};
+  fields.forEach(f=>{
+    const fl=f.label.toLowerCase().replace(/[^a-z]/g,'');
+    headers.forEach((h,i)=>{const hl=h.toLowerCase().replace(/[^a-z]/g,'');if(hl.includes(fl.slice(0,5))||fl.includes(hl.slice(0,5)))auto[f.key]=i+1;});
+  });
+  document.getElementById('mapper-wrap').innerHTML=`
+    <div class="col-mapper">
+      <div class="col-mapper-title">MAP COLUMNS — System Field ← Your Column</div>
+      ${fields.map(f=>`<div class="col-map-grid"><div class="field-label">${f.label}${f.req?'<span class="required-star"> *</span>':''}</div><div style="font-family:var(--mono);font-size:12px;color:var(--text3);text-align:center;">←</div><select id="map-${f.key}" onchange="updateMapping()">${opts.map((o,i)=>`<option value="${i}"${auto[f.key]&&auto[f.key]===i?' selected':''}>${escHtml(o)}</option>`).join('')}</select></div>`).join('')}
+    </div>
+    <div class="preview-wrap"><div class="preview-title">PREVIEW (3 rows)</div><table><thead><tr>${headers.map(h=>`<th>${escHtml(h)}</th>`).join('')}</tr></thead><tbody>${rows.slice(1,4).map(r=>`<tr>${headers.map((_,i)=>`<td>${escHtml(r[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+  `;
+  updateMapping();
+}
+function updateMapping(){
+  importCtx.mapping={};
+  FIELDS[importCtx.type].forEach(f=>{const el=document.getElementById('map-'+f.key);if(el){const v=parseInt(el.value);if(v>0)importCtx.mapping[f.key]=v-1;}});
+  const ok=FIELDS[importCtx.type].filter(f=>f.req).every(f=>importCtx.mapping[f.key]!==undefined);
+  const nb=document.getElementById('next-btn');if(nb)nb.style.display=ok?'block':'none';
+}
+function renderImportStep3(){
+  const fields=FIELDS[importCtx.type];
+  // For cargo types the required field key is port/vessel, not name
+  const reqKey = (importCtx.type==='cargo_ops') ? 'port' : (importCtx.type==='cargo_sts') ? 'vessel' : 'name';
+  const items=importCtx.parsedRows.slice(1).filter(r=>r.some(c=>c!=='')).map(r=>{const o={};fields.forEach(f=>{if(importCtx.mapping[f.key]!==undefined)o[f.key]=r[importCtx.mapping[f.key]];});return o;}).filter(o=>o[reqKey]&&String(o[reqKey]).trim()!=='');
+  if(!items.length){toast('No valid rows found','error');return;}
+  const hdrs=fields.filter(f=>importCtx.mapping[f.key]!==undefined).map(f=>f.label);
+  document.getElementById('modal-body').innerHTML=`
+    <div class="import-steps"><div class="imp-step done">1 ✓</div><div class="imp-step done">2 ✓</div><div class="imp-step active">3 · CONFIRM</div></div>
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:14px 18px;margin-bottom:14px;display:flex;gap:16px;align-items:center;">
+      <div><div style="font-family:var(--cond);font-size:32px;font-weight:700;color:var(--accent2);">${items.length}</div><div style="font-family:var(--mono);font-size:10px;color:var(--text3);">ROWS READY</div></div>
+      <div style="font-size:13px;color:var(--text2);">Choose <b style="color:var(--accent)">APPEND</b> to add to existing, or <b style="color:var(--warn)">REPLACE</b> to overwrite all.</div>
+    </div>
+    <div class="preview-wrap" style="max-height:260px;overflow-y:auto;"><div class="preview-title">PREVIEW — ${items.length} rows</div><table><thead><tr>${hdrs.map(h=>`<th>${escHtml(h)}</th>`).join('')}</tr></thead><tbody>${items.slice(0,40).map(it=>`<tr>${fields.filter(f=>importCtx.mapping[f.key]!==undefined).map(f=>`<td>${escHtml(it[f.key]||'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="btn btn-outline" onclick="renderImportStep2()">← BACK</button>
+      <button class="btn btn-warn" onclick='confirmImport("replace",${JSON.stringify(items).replace(/'/g,"&#39;")})'>REPLACE (${items.length})</button>
+      <button class="btn btn-success" onclick='confirmImport("append",${JSON.stringify(items).replace(/'/g,"&#39;")})'>APPEND (${items.length})</button>
+    </div>
+  `;
+}
+function normDT(val){
+  // Normalize datetime string from Excel for datetime-local input (YYYY-MM-DDTHH:MM)
+  if(!val) return '';
+  const s=String(val).trim();
+  // Already ISO
+  if(s.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)) return s.slice(0,16);
+  // Date + space + time: 2025-03-01 06:00
+  if(s.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/)) return s.slice(0,10)+'T'+s.slice(11,16);
+  // Excel numeric date
+  if(typeof val==='number') return new Date(Math.round((val-25569)*86400*1000)).toISOString().slice(0,16);
+  if(val instanceof Date) return val.toISOString().slice(0,16);
+  return s;
+}
+
+function confirmImport(mode,items){
+  const type=importCtx.type, td=today();
+  let proc;
+  if(type==='cargo_ops'){
+    proc=items.map(it=>({
+      id:uid(), port:String(it.port||''), type:it.type||'Loading',
+      cargo:it.cargo||'', qty:+it.qty||0, api:it.api||'',
+      berth:it.berth||'', charter:it.charter||'',
+      start:normDT(it.start), end:normDT(it.end),
+      remarks:it.remarks||'', added:td
+    }));
+    if(mode==='replace') state.cargo.ops=proc;
+    else state.cargo.ops.push(...proc);
+  } else if(type==='cargo_sts'){
+    proc=items.map(it=>({
+      id:uid(), vessel:String(it.vessel||''), imo:it.imo||'',
+      type:it.type||'Ship-to-Ship Transfer (Give)',
+      cargo:it.cargo||'', qty:+it.qty||0, loc:it.loc||'',
+      start:normDT(it.start), end:normDT(it.end),
+      mm:it.mm||'', remarks:it.remarks||'', added:td
+    }));
+    if(mode==='replace') state.cargo.sts=proc;
+    else state.cargo.sts.push(...proc);
+  } else {
+    proc=items.map(it=>{
+      const base={id:uid()};
+      if(type==='medical') return{...base,name:String(it.name||''),cat:it.cat||'Other',qty:+it.qty||0,unit:it.unit||'',min:+it.min||0,exp:excelDateToStr(it.exp),loc:it.loc||'',added:td};
+      if(type==='stationery') return{...base,name:String(it.name||''),cat:it.cat||'Other',qty:+it.qty||0,unit:it.unit||'',min:+it.min||0,loc:it.loc||'',updated:td};
+      return{...base,name:String(it.name||''),type:it.type||'Other',maker:it.maker||'',last:excelDateToStr(it.last),next:excelDateToStr(it.next),interval:+it.interval||365,remarks:it.remarks||''};
+    });
+    if(mode==='replace'){if(type==='medical')state.medical=proc;else if(type==='stationery')state.stationery=proc;else state.navEquip=proc;}
+    else{if(type==='medical')state.medical.push(...proc);else if(type==='stationery')state.stationery.push(...proc);else state.navEquip.push(...proc);}
+  }
+  save();
+  renderMedical();renderStationery();renderNavEquip();renderCargo();
+  closeImport();
+  toast(`✓ ${proc.length} rows imported`,'success');
+}
+
+// ══════════════════════════════════════════════════
+//  CLOUD SYNC ENGINE — Firebase Firestore REST API
+// ══════════════════════════════════════════════════
+let syncState = {
+  projectId: '',
+  apiKey: '',
+  docId: 'vessel-data',
+  lastPush: null,
+  lastPull: null,
+  autoSync: false,
+  autoTimer: null,
+  logs: []
+};
+
+// ── Firestore REST helpers ──
+function fbBaseUrl(){
+  return `https://firestore.googleapis.com/v1/projects/${syncState.projectId}/databases/(default)/documents/secondbrain/${syncState.docId}`;
+}
+function fbApiUrl(extra=''){
+  return fbBaseUrl() + `?key=${syncState.apiKey}` + extra;
+}
+
+// Firestore stores everything as {fields:{key:{stringValue:'...'}}}
+// We store the entire state JSON as a single string field
+function toFirestore(data){
+  return { fields: { payload: { stringValue: JSON.stringify(data) } } };
+}
+function fromFirestore(doc){
+  const sv = doc?.fields?.payload?.stringValue;
+  if(!sv) throw new Error('No payload field in Firestore doc');
+  return JSON.parse(sv);
+}
+
+// ── Persist / load sync config ──
+function loadSyncState(){
+  try{
+    const d = localStorage.getItem('2off_fb_cfg');
+    if(d){
+      const p = JSON.parse(d);
+      syncState = { ...syncState, ...p };
+    }
+  }catch(e){}
+}
+function saveSyncState(){
+  try{
+    localStorage.setItem('2off_fb_cfg', JSON.stringify({
+      projectId: syncState.projectId,
+      apiKey:    syncState.apiKey,
+      docId:     syncState.docId,
+      lastPush:  syncState.lastPush,
+      lastPull:  syncState.lastPull,
+      autoSync:  syncState.autoSync
+    }));
+  }catch(e){}
+}
+
+// ── Log ──
+function syncLog(msg, type='info'){
+  const ts = new Date().toISOString().slice(11,19);
+  syncState.logs.unshift({ ts, msg, type });
+  if(syncState.logs.length > 40) syncState.logs.pop();
+  const el = document.getElementById('sync-log');
+  if(el) el.innerHTML = syncState.logs.length
+    ? syncState.logs.map(l=>`<div class="${l.type}">[${l.ts}] ${escHtml(l.msg)}</div>`).join('')
+    : '<span style="color:var(--text3);">No activity yet</span>';
+}
+
+// ── Sync pill ──
+function setSyncPill(s, label){
+  const p = document.getElementById('sync-pill');
+  const l = document.getElementById('sync-label');
+  if(!p) return;
+  p.className = 'sync-pill ' + s;
+  if(l) l.textContent = label;
+}
+
+// ── Modal tabs ──
+function showSyncTab(tab){
+  document.getElementById('sync-tab-setup').style.display  = tab==='setup'  ? '' : 'none';
+  document.getElementById('sync-tab-status').style.display = tab==='status' ? '' : 'none';
+  const sa = tab==='setup'  ? 'var(--accent)' : 'var(--text3)';
+  const sb = tab==='status' ? 'var(--accent)' : 'var(--text3)';
+  document.getElementById('stab-setup').style.cssText  += `;border-bottom:2px solid ${sa};color:${sa}`;
+  document.getElementById('stab-status').style.cssText += `;border-bottom:2px solid ${sb};color:${sb}`;
+}
+
+// ── Open / Close modal ──
+function openSyncModal(){
+  loadSyncState();
+  // Populate setup fields
+  document.getElementById('fb-project-id').value = syncState.projectId||'';
+  document.getElementById('fb-api-key').value     = syncState.apiKey||'';
+  document.getElementById('fb-doc-id').value      = syncState.docId||'vessel-data';
+  document.getElementById('fb-test-result').textContent = '';
+  // Populate status
+  document.getElementById('ss-project').textContent  = syncState.projectId || '—';
+  document.getElementById('ss-status').textContent   = syncState.projectId ? '✓ Configured' : 'Not configured';
+  document.getElementById('ss-push').textContent     = syncState.lastPush ? new Date(syncState.lastPush).toISOString().replace('T',' ').slice(0,16)+' UTC' : '—';
+  document.getElementById('ss-pull').textContent     = syncState.lastPull ? new Date(syncState.lastPull).toISOString().replace('T',' ').slice(0,16)+' UTC' : '—';
+  document.getElementById('auto-sync-toggle').checked = !!syncState.autoSync;
+  document.getElementById('auto-sync-label').textContent = syncState.autoSync ? 'ON (every 5 min)' : 'OFF';
+  // Reload log
+  const el = document.getElementById('sync-log');
+  if(el) el.innerHTML = syncState.logs.length
+    ? syncState.logs.map(l=>`<div class="${l.type}">[${l.ts}] ${escHtml(l.msg)}</div>`).join('')
+    : '<span style="color:var(--text3);">No activity yet</span>';
+  // Show setup tab by default if not configured, else status
+  showSyncTab(syncState.projectId ? 'status' : 'setup');
+  document.getElementById('sync-modal').style.display='flex';
+}
+function closeSyncModal(){ document.getElementById('sync-modal').style.display='none'; }
+
+// ── Save config & test connection ──
+async function saveFbConfig(){
+  const pid = document.getElementById('fb-project-id').value.trim();
+  const key = document.getElementById('fb-api-key').value.trim();
+  const did = document.getElementById('fb-doc-id').value.trim() || 'vessel-data';
+  const res = document.getElementById('fb-test-result');
+
+  if(!pid || !key){
+    res.innerHTML = '<span style="color:var(--danger);">⚠ Project ID and API Key are required</span>';
+    return;
+  }
+
+  res.innerHTML = '<span style="color:var(--warn);">Testing connection…</span>';
+  syncState.projectId = pid;
+  syncState.apiKey    = key;
+  syncState.docId     = did;
+
+  // Test: try a GET — if doc doesn't exist Firestore returns 404 which is fine
+  try{
+    const url = `https://firestore.googleapis.com/v1/projects/${pid}/databases/(default)/documents/secondbrain/${did}?key=${key}`;
+    const r = await fetch(url);
+    if(r.status === 200 || r.status === 404){
+      // 200 = doc exists, 404 = collection/doc doesn't exist yet — both mean auth works
+      saveSyncState();
+      setSyncPill('synced','READY');
+      res.innerHTML = '<span style="color:var(--accent2);">✓ Connection successful! Firebase is ready.</span>';
+      document.getElementById('ss-project').textContent = pid;
+      document.getElementById('ss-status').textContent  = '✓ Configured';
+      syncLog(`Firebase configured: ${pid} / ${did}`,'ok');
+      toast('FIREBASE CONNECTED ✓','success');
+      setTimeout(()=>showSyncTab('status'), 1200);
+    } else {
+      const err = await r.json();
+      throw new Error(err?.error?.message || `HTTP ${r.status}`);
+    }
+  } catch(e){
+    res.innerHTML = `<span style="color:var(--danger);">✗ Error: ${escHtml(e.message)} — check Project ID / API Key</span>`;
+    setSyncPill('error','ERROR');
+    syncLog('Config test failed: '+e.message,'err');
+  }
+}
+
+// ── Disconnect ──
+function clearFbConfig(){
+  if(!confirm('Disconnect Firebase? Local data is kept.')) return;
+  syncState.projectId=''; syncState.apiKey=''; syncState.lastPush=null; syncState.lastPull=null; syncState.autoSync=false;
+  if(syncState.autoTimer){ clearInterval(syncState.autoTimer); syncState.autoTimer=null; }
+  saveSyncState();
+  document.getElementById('fb-project-id').value='';
+  document.getElementById('fb-api-key').value='';
+  document.getElementById('ss-status').textContent='Not configured';
+  document.getElementById('ss-project').textContent='—';
+  document.getElementById('ss-push').textContent='—';
+  document.getElementById('ss-pull').textContent='—';
+  document.getElementById('auto-sync-toggle').checked=false;
+  document.getElementById('auto-sync-label').textContent='OFF';
+  setSyncPill('offline','OFFLINE');
+  syncLog('Firebase disconnected','info');
+  toast('DISCONNECTED','warn');
+  showSyncTab('setup');
+}
+
+// ── PUSH: save state to Firestore ──
+async function syncPush(){
+  if(!syncState.projectId){ toast('Configure Firebase first','error'); openSyncModal(); return; }
+  setSyncPill('syncing','PUSHING');
+  syncLog('Pushing to Firebase…','info');
+  try{
+    const url = `https://firestore.googleapis.com/v1/projects/${syncState.projectId}/databases/(default)/documents/secondbrain/${syncState.docId}?key=${syncState.apiKey}`;
+    const body = JSON.stringify(toFirestore(state));
+    const r = await fetch(url, {
+      method: 'PATCH',   // PATCH = upsert (create or update)
+      headers: { 'Content-Type': 'application/json' },
+      body
+    });
+    if(!r.ok){
+      const err = await r.json();
+      throw new Error(err?.error?.message || `HTTP ${r.status}`);
+    }
+    syncState.lastPush = new Date().toISOString();
+    saveSyncState();
+    document.getElementById('ss-push').textContent = new Date(syncState.lastPush).toISOString().replace('T',' ').slice(0,16)+' UTC';
+    setSyncPill('synced','SYNCED');
+    syncLog('Push successful ✓','ok');
+    toast('PUSHED TO FIREBASE ✓','success');
+  } catch(e){
+    setSyncPill('error','ERROR');
+    syncLog('Push failed: '+e.message,'err');
+    toast('PUSH FAILED — '+e.message,'error');
+  }
+}
+
+// ── PULL: load state from Firestore ──
+async function syncPull(){
+  if(!syncState.projectId){ toast('Configure Firebase first','error'); openSyncModal(); return; }
+  setSyncPill('syncing','PULLING');
+  syncLog('Pulling from Firebase…','info');
+  try{
+    const url = `https://firestore.googleapis.com/v1/projects/${syncState.projectId}/databases/(default)/documents/secondbrain/${syncState.docId}?key=${syncState.apiKey}`;
+    const r = await fetch(url, { cache:'no-store' });
+    if(r.status === 404){
+      // No data yet — push local data first
+      syncLog('No cloud data yet — pushing local data first…','info');
+      setSyncPill('synced','READY');
+      toast('No cloud data yet — use PUSH first','warn');
+      return;
+    }
+    if(!r.ok){
+      const err = await r.json();
+      throw new Error(err?.error?.message || `HTTP ${r.status}`);
+    }
+    const doc = await r.json();
+    const remote = fromFirestore(doc);
+    // Merge: remote wins, preserve local pin
+    const localPin = state.pin;
+    state = { ...state, ...remote };
+    state.pin = remote.pin || localPin;  // keep more recent pin
+    if(!state.cargo) state.cargo = { ops:[], sts:[] };
+    save();
+    // Re-render everything
+    renderMedical(); renderStationery(); renderNavEquip();
+    renderNotes(); renderDashboard(); renderCargo();
+    updateHeader();
+    syncState.lastPull = new Date().toISOString();
+    saveSyncState();
+    document.getElementById('ss-pull').textContent = new Date(syncState.lastPull).toISOString().replace('T',' ').slice(0,16)+' UTC';
+    setSyncPill('synced','SYNCED');
+    syncLog('Pull successful — all data updated ✓','ok');
+    toast('PULLED FROM FIREBASE ✓','success');
+  } catch(e){
+    setSyncPill('error','ERROR');
+    syncLog('Pull failed: '+e.message,'err');
+    toast('PULL FAILED — '+e.message,'error');
+  }
+}
+
+// ── Auto sync ──
+function toggleAutoSync(){
+  const on = document.getElementById('auto-sync-toggle').checked;
+  syncState.autoSync = on;
+  document.getElementById('auto-sync-label').textContent = on ? 'ON (every 5 min)' : 'OFF';
+  if(syncState.autoTimer){ clearInterval(syncState.autoTimer); syncState.autoTimer=null; }
+  if(on && syncState.projectId){
+    syncState.autoTimer = setInterval(()=>syncPush(), 5*60*1000);
+    syncLog('Auto-sync ON — every 5 min','ok');
+    toast('AUTO-SYNC ENABLED','success');
+  } else {
+    syncLog('Auto-sync OFF','info');
+  }
+  saveSyncState();
+}
+
+// ── Init on app load ──
+function initSync(){
+  loadSyncState();
+  if(syncState.projectId){
+    setSyncPill('synced','READY');
+    if(syncState.autoSync && syncState.autoTimer===null){
+      syncState.autoTimer = setInterval(()=>syncPush(), 5*60*1000);
+    }
+  } else {
+    setSyncPill('offline','OFFLINE');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+load();
+updateHeader();
+renderMedical();renderStationery();renderNavEquip();renderNotes();renderDashboard();renderCargo();
+initSync();
+// Show lock screen on startup
+lockApp();
+
+// 🌗 APPLY THEME
+function applyTheme(mode){
+  const body = document.body;
+  const toggle = document.getElementById('themeToggle');
+  if(mode === 'light'){
+    body.classList.add('light');
+    if(toggle) toggle.checked = true;
+  }else{
+    body.classList.remove('light');
+    if(toggle) toggle.checked = false;
+  }
+}
+
+// 🔘 TOGGLE
+function toggleTheme(){
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  applyTheme(isLight ? 'light' : 'dark');
+}
+
+// 🤖 AUTO DETECT
+(function(){
+  const saved = localStorage.getItem('theme');
+  if(saved){
+    applyTheme(saved);
+  }else{
+    const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+    applyTheme(prefersLight ? 'light' : 'dark');
+  }
+
+  window.matchMedia('(prefers-color-scheme: light)')
+    .addEventListener('change', e=>{
+      if(!localStorage.getItem('theme')){
+        applyTheme(e.matches ? 'light' : 'dark');
+      }
+    });
+})();
+
+</script>
+</body>
+</html>
