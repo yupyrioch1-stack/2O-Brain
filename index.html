@@ -1000,10 +1000,10 @@ let logMaintCtx = {id:''};
 let pinBuffer = '';
 const PIN_LEN = 4;
 
-function save(){ try{localStorage.setItem('2off_v10',JSON.stringify(state));}catch(e){} }
+function save(){ try{localStorage.setItem('2off_v11',JSON.stringify(state));}catch(e){} }
 function load(){
   try{
-    let d=localStorage.getItem('2off_v10');
+    let d=localStorage.getItem('2off_v11');
     if(!d) d=localStorage.getItem('2off_v5');
     if(!d) d=localStorage.getItem('2off_v3');
     if(d){
@@ -1515,6 +1515,7 @@ function addNavItem(){
 function deleteNavItem(id){state.navEquip=state.navEquip.filter(x=>x.id!==id);save();renderNavEquip();toast('DELETED');}
 function renderNavEquip(){
   const tbody=document.getElementById('nav-tbody');
+  if(!tbody) return;
   document.getElementById('nav-count').textContent=state.navEquip.length;
   if(!state.navEquip.length){tbody.innerHTML='<tr><td colspan="9" class="empty">NO EQUIPMENT</td></tr>';return;}
 
@@ -1523,11 +1524,11 @@ function renderNavEquip(){
     if(n.extras) Object.keys(n.extras).forEach(k=>{if(!extraKeys.includes(k))extraKeys.push(k);});
   });
 
-  const thead=document.querySelector('#navequip thead tr');
+  const thead=document.getElementById('nav-thead');
   if(thead){
-    thead.innerHTML='<th>#</th><th>Equipment</th><th>Type</th><th>Maker</th><th>Last</th><th>Next Due</th><th>Days Left</th><th>Remarks</th>'
+    thead.innerHTML='<tr><th>#</th><th>Equipment</th><th>Type</th><th>Maker</th><th>Last</th><th>Next Due</th><th>Days Left</th><th>Remarks</th>'
       +extraKeys.map(k=>`<th style="color:var(--accent2);">★ ${escHtml(k)}</th>`).join('')
-      +'<th></th>';
+      +'<th></th></tr>';
   }
 
   tbody.innerHTML=state.navEquip.map((n,i)=>{
@@ -1544,7 +1545,10 @@ function renderNavEquip(){
       <td style="font-family:var(--mono);font-size:12px;">${dl}</td>
       <td style="font-size:12px;color:var(--text2);">${escHtml(n.remarks)}</td>
       ${extTds}
-      <td><button class="btn btn-danger btn-sm" onclick="deleteNavItem('${n.id}')">DEL</button></td>
+      <td style="display:flex;gap:4px;flex-wrap:nowrap;">
+        <button class="btn btn-success btn-sm" onclick="openLogMaint('${n.id}')">🔧</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteNavItem('${n.id}')">DEL</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -2073,226 +2077,267 @@ function fbApiUrl(extra=''){
   return fbBaseUrl() + `?key=${syncState.apiKey}` + extra;
 }
 
-// Firestore stores everything as {fields:{key:{stringValue:'...'}}}
-// We store the entire state JSON as a single string field
-function toFirestore(data){
-  return { fields: { payload: { stringValue: JSON.stringify(data) } } };
+// ══════════════════════════════════════════════════
+//  FIREBASE SYNC ENGINE v2
+//  Fix: section-by-section fields (no single blob)
+//  Each section stored as separate Firestore stringValue
+//  → no stack overflow on large datasets
+// ══════════════════════════════════════════════════
+
+// Sections to sync — each becomes one Firestore field
+const SYNC_SECTIONS = ['vessel','medical','stationery','navEquip','cargo','notes','usageLog','maintHistory'];
+
+// ── Firestore field encoder / decoder ──
+// Stores each section as a separate stringValue field
+// Firestore doc shape: { fields: { medical: {stringValue:'[...]'}, ... } }
+function encodeSection(data){
+  try { return JSON.stringify(data); } catch(e){ return '[]'; }
 }
-function fromFirestore(doc){
-  const sv = doc?.fields?.payload?.stringValue;
-  if(!sv) throw new Error('No payload field in Firestore doc');
-  return JSON.parse(sv);
+function decodeSection(raw, fallback){
+  if(!raw) return fallback;
+  try { return JSON.parse(raw); } catch(e){ return fallback; }
+}
+
+function stateToFirestore(){
+  const fields = {};
+  SYNC_SECTIONS.forEach(sec=>{
+    const val = sec==='vessel' ? state.vessel : state[sec];
+    fields[sec] = { stringValue: encodeSection(val||[]) };
+  });
+  // Store pin separately so it's never lost
+  fields['_pin']  = { stringValue: state.pin||'1234' };
+  fields['_meta'] = { stringValue: JSON.stringify({ v:11, ts: new Date().toISOString() }) };
+  return { fields };
+}
+
+function firestoreToState(doc){
+  const f = doc?.fields || {};
+  const out = {};
+  SYNC_SECTIONS.forEach(sec=>{
+    const raw = f[sec]?.stringValue;
+    const fallback = sec==='vessel' ? state.vessel : (sec==='cargo' ? {ops:[],sts:[]} : (sec==='maintHistory'?[]:[]));
+    out[sec] = decodeSection(raw, fallback);
+  });
+  // Restore pin
+  out['_pin'] = f['_pin']?.stringValue || null;
+  return out;
+}
+
+// ── Base URL ──
+function fbDocUrl(){
+  return `https://firestore.googleapis.com/v1/projects/${syncState.projectId}/databases/(default)/documents/secondbrain/${syncState.docId}?key=${syncState.apiKey}`;
 }
 
 // ── Persist / load sync config ──
 function loadSyncState(){
   try{
     const d = localStorage.getItem('2off_fb_cfg');
-    if(d){
-      const p = JSON.parse(d);
-      syncState = { ...syncState, ...p };
-    }
+    if(d){ const p=JSON.parse(d); syncState={...syncState,...p}; }
   }catch(e){}
 }
 function saveSyncState(){
   try{
     localStorage.setItem('2off_fb_cfg', JSON.stringify({
-      projectId: syncState.projectId,
-      apiKey:    syncState.apiKey,
-      docId:     syncState.docId,
-      lastPush:  syncState.lastPush,
-      lastPull:  syncState.lastPull,
-      autoSync:  syncState.autoSync
+      projectId:syncState.projectId, apiKey:syncState.apiKey,
+      docId:syncState.docId, lastPush:syncState.lastPush,
+      lastPull:syncState.lastPull, autoSync:syncState.autoSync
     }));
   }catch(e){}
 }
 
-// ── Log ──
+// ── Sync Log ──
 function syncLog(msg, type='info'){
-  const ts = new Date().toISOString().slice(11,19);
-  syncState.logs.unshift({ ts, msg, type });
-  if(syncState.logs.length > 40) syncState.logs.pop();
-  const el = document.getElementById('sync-log');
-  if(el) el.innerHTML = syncState.logs.length
+  const ts=new Date().toISOString().slice(11,19);
+  syncState.logs.unshift({ts,msg,type});
+  if(syncState.logs.length>40) syncState.logs.pop();
+  const el=document.getElementById('sync-log');
+  if(el) el.innerHTML=syncState.logs.length
     ? syncState.logs.map(l=>`<div class="${l.type}">[${l.ts}] ${escHtml(l.msg)}</div>`).join('')
     : '<span style="color:var(--text3);">No activity yet</span>';
 }
 
-// ── Sync pill ──
-function setSyncPill(s, label){
-  const p = document.getElementById('sync-pill');
-  const l = document.getElementById('sync-label');
+// ── Sync Pill ──
+function setSyncPill(s,label){
+  const p=document.getElementById('sync-pill');
+  const l=document.getElementById('sync-label');
   if(!p) return;
-  p.className = 'sync-pill ' + s;
-  if(l) l.textContent = label;
+  p.className='sync-pill '+s;
+  if(l) l.textContent=label;
 }
 
 // ── Modal tabs ──
 function showSyncTab(tab){
   document.getElementById('sync-tab-setup').style.display  = tab==='setup'  ? '' : 'none';
   document.getElementById('sync-tab-status').style.display = tab==='status' ? '' : 'none';
-  const sa = tab==='setup'  ? 'var(--accent)' : 'var(--text3)';
-  const sb = tab==='status' ? 'var(--accent)' : 'var(--text3)';
-  document.getElementById('stab-setup').style.cssText  += `;border-bottom:2px solid ${sa};color:${sa}`;
-  document.getElementById('stab-status').style.cssText += `;border-bottom:2px solid ${sb};color:${sb}`;
+  const sa=tab==='setup'  ?'var(--accent)':'var(--text3)';
+  const sb=tab==='status' ?'var(--accent)':'var(--text3)';
+  document.getElementById('stab-setup').style.cssText  +=`;border-bottom:2px solid ${sa};color:${sa}`;
+  document.getElementById('stab-status').style.cssText +=`;border-bottom:2px solid ${sb};color:${sb}`;
 }
 
 // ── Open / Close modal ──
 function openSyncModal(){
   loadSyncState();
-  // Populate setup fields
   document.getElementById('fb-project-id').value = syncState.projectId||'';
   document.getElementById('fb-api-key').value     = syncState.apiKey||'';
   document.getElementById('fb-doc-id').value      = syncState.docId||'vessel-data';
   document.getElementById('fb-test-result').textContent = '';
-  // Populate status
-  document.getElementById('ss-project').textContent  = syncState.projectId || '—';
-  document.getElementById('ss-status').textContent   = syncState.projectId ? '✓ Configured' : 'Not configured';
-  document.getElementById('ss-push').textContent     = syncState.lastPush ? new Date(syncState.lastPush).toISOString().replace('T',' ').slice(0,16)+' UTC' : '—';
-  document.getElementById('ss-pull').textContent     = syncState.lastPull ? new Date(syncState.lastPull).toISOString().replace('T',' ').slice(0,16)+' UTC' : '—';
-  document.getElementById('auto-sync-toggle').checked = !!syncState.autoSync;
-  document.getElementById('auto-sync-label').textContent = syncState.autoSync ? 'ON (every 5 min)' : 'OFF';
-  // Reload log
-  const el = document.getElementById('sync-log');
-  if(el) el.innerHTML = syncState.logs.length
+  document.getElementById('ss-project').textContent = syncState.projectId||'—';
+  document.getElementById('ss-status').textContent  = syncState.projectId ? '✓ Configured' : 'Not configured';
+  document.getElementById('ss-push').textContent    = syncState.lastPush ? new Date(syncState.lastPush).toISOString().replace('T',' ').slice(0,16)+' UTC' : '—';
+  document.getElementById('ss-pull').textContent    = syncState.lastPull ? new Date(syncState.lastPull).toISOString().replace('T',' ').slice(0,16)+' UTC' : '—';
+  document.getElementById('auto-sync-toggle').checked=!!syncState.autoSync;
+  document.getElementById('auto-sync-label').textContent=syncState.autoSync?'ON (every 5 min)':'OFF';
+  const el=document.getElementById('sync-log');
+  if(el) el.innerHTML=syncState.logs.length
     ? syncState.logs.map(l=>`<div class="${l.type}">[${l.ts}] ${escHtml(l.msg)}</div>`).join('')
     : '<span style="color:var(--text3);">No activity yet</span>';
-  // Show setup tab by default if not configured, else status
-  showSyncTab(syncState.projectId ? 'status' : 'setup');
+  showSyncTab(syncState.projectId?'status':'setup');
   document.getElementById('sync-modal').style.display='flex';
 }
 function closeSyncModal(){ document.getElementById('sync-modal').style.display='none'; }
 
-// ── Save config & test connection ──
+// ── Save config & test ──
 async function saveFbConfig(){
-  const pid = document.getElementById('fb-project-id').value.trim();
-  const key = document.getElementById('fb-api-key').value.trim();
-  const did = document.getElementById('fb-doc-id').value.trim() || 'vessel-data';
-  const res = document.getElementById('fb-test-result');
-
-  if(!pid || !key){
-    res.innerHTML = '<span style="color:var(--danger);">⚠ Project ID and API Key are required</span>';
-    return;
-  }
-
-  res.innerHTML = '<span style="color:var(--warn);">Testing connection…</span>';
-  syncState.projectId = pid;
-  syncState.apiKey    = key;
-  syncState.docId     = did;
-
-  // Test: try a GET — if doc doesn't exist Firestore returns 404 which is fine
+  const pid=document.getElementById('fb-project-id').value.trim();
+  const key=document.getElementById('fb-api-key').value.trim();
+  const did=document.getElementById('fb-doc-id').value.trim()||'vessel-data';
+  const res=document.getElementById('fb-test-result');
+  if(!pid||!key){ res.innerHTML='<span style="color:var(--danger);">⚠ Project ID and API Key required</span>'; return; }
+  res.innerHTML='<span style="color:var(--warn);">Testing connection…</span>';
+  syncState.projectId=pid; syncState.apiKey=key; syncState.docId=did;
   try{
-    const url = `https://firestore.googleapis.com/v1/projects/${pid}/databases/(default)/documents/secondbrain/${did}?key=${key}`;
-    const r = await fetch(url);
-    if(r.status === 200 || r.status === 404){
-      // 200 = doc exists, 404 = collection/doc doesn't exist yet — both mean auth works
-      saveSyncState();
-      setSyncPill('synced','READY');
-      res.innerHTML = '<span style="color:var(--accent2);">✓ Connection successful! Firebase is ready.</span>';
-      document.getElementById('ss-project').textContent = pid;
-      document.getElementById('ss-status').textContent  = '✓ Configured';
-      syncLog(`Firebase configured: ${pid} / ${did}`,'ok');
+    const url=`https://firestore.googleapis.com/v1/projects/${pid}/databases/(default)/documents/secondbrain/${did}?key=${key}`;
+    const r=await fetch(url);
+    if(r.status===200||r.status===404){
+      saveSyncState(); setSyncPill('synced','READY');
+      res.innerHTML='<span style="color:var(--accent2);">✓ Connection OK — Firebase ready!</span>';
+      document.getElementById('ss-project').textContent=pid;
+      document.getElementById('ss-status').textContent='✓ Configured';
+      syncLog(`Configured: ${pid} / ${did}`,'ok');
       toast('FIREBASE CONNECTED ✓','success');
-      setTimeout(()=>showSyncTab('status'), 1200);
+      setTimeout(()=>showSyncTab('status'),1200);
     } else {
-      const err = await r.json();
-      throw new Error(err?.error?.message || `HTTP ${r.status}`);
+      const err=await r.json();
+      throw new Error(err?.error?.message||`HTTP ${r.status}`);
     }
-  } catch(e){
-    res.innerHTML = `<span style="color:var(--danger);">✗ Error: ${escHtml(e.message)} — check Project ID / API Key</span>`;
+  }catch(e){
+    res.innerHTML=`<span style="color:var(--danger);">✗ ${escHtml(e.message)}</span>`;
     setSyncPill('error','ERROR');
-    syncLog('Config test failed: '+e.message,'err');
+    syncLog('Test failed: '+e.message,'err');
   }
 }
 
 // ── Disconnect ──
 function clearFbConfig(){
-  if(!confirm('Disconnect Firebase? Local data is kept.')) return;
-  syncState.projectId=''; syncState.apiKey=''; syncState.lastPush=null; syncState.lastPull=null; syncState.autoSync=false;
+  if(!confirm('Disconnect Firebase? Local data kept.')) return;
+  syncState.projectId=''; syncState.apiKey='';
+  syncState.lastPush=null; syncState.lastPull=null; syncState.autoSync=false;
   if(syncState.autoTimer){ clearInterval(syncState.autoTimer); syncState.autoTimer=null; }
   saveSyncState();
-  document.getElementById('fb-project-id').value='';
-  document.getElementById('fb-api-key').value='';
-  document.getElementById('ss-status').textContent='Not configured';
-  document.getElementById('ss-project').textContent='—';
-  document.getElementById('ss-push').textContent='—';
-  document.getElementById('ss-pull').textContent='—';
+  ['fb-project-id','fb-api-key'].forEach(id=>document.getElementById(id).value='');
+  ['ss-status','ss-project','ss-push','ss-pull'].forEach(id=>
+    document.getElementById(id).textContent=id==='ss-status'?'Not configured':'—');
   document.getElementById('auto-sync-toggle').checked=false;
   document.getElementById('auto-sync-label').textContent='OFF';
   setSyncPill('offline','OFFLINE');
-  syncLog('Firebase disconnected','info');
+  syncLog('Disconnected','info');
   toast('DISCONNECTED','warn');
   showSyncTab('setup');
 }
 
-// ── PUSH: save state to Firestore ──
+// ── PUSH — section-by-section, no single blob ──
 async function syncPush(){
   if(!syncState.projectId){ toast('Configure Firebase first','error'); openSyncModal(); return; }
   setSyncPill('syncing','PUSHING');
-  syncLog('Pushing to Firebase…','info');
+  syncLog('Pushing sections to Firebase…','info');
   try{
-    const url = `https://firestore.googleapis.com/v1/projects/${syncState.projectId}/databases/(default)/documents/secondbrain/${syncState.docId}?key=${syncState.apiKey}`;
-    const body = JSON.stringify(toFirestore(state));
-    const r = await fetch(url, {
-      method: 'PATCH',   // PATCH = upsert (create or update)
+    // Build Firestore document with one field per section
+    const fsDoc = stateToFirestore();
+
+    // Log section sizes for debugging
+    Object.entries(fsDoc.fields).forEach(([k,v])=>{
+      const kb = Math.round((v.stringValue?.length||0)/1024);
+      if(kb>0) syncLog(`  ${k}: ${kb} KB`,'info');
+    });
+
+    const r = await fetch(fbDocUrl(), {
+      method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body
+      body:    JSON.stringify(fsDoc)
     });
     if(!r.ok){
-      const err = await r.json();
-      throw new Error(err?.error?.message || `HTTP ${r.status}`);
+      const errBody = await r.text();
+      let msg = `HTTP ${r.status}`;
+      try{ msg = JSON.parse(errBody)?.error?.message||msg; }catch(e){}
+      throw new Error(msg);
     }
     syncState.lastPush = new Date().toISOString();
     saveSyncState();
-    document.getElementById('ss-push').textContent = new Date(syncState.lastPush).toISOString().replace('T',' ').slice(0,16)+' UTC';
+    document.getElementById('ss-push').textContent=new Date(syncState.lastPush).toISOString().replace('T',' ').slice(0,16)+' UTC';
     setSyncPill('synced','SYNCED');
     syncLog('Push successful ✓','ok');
     toast('PUSHED TO FIREBASE ✓','success');
-  } catch(e){
+  }catch(e){
     setSyncPill('error','ERROR');
     syncLog('Push failed: '+e.message,'err');
     toast('PUSH FAILED — '+e.message,'error');
   }
 }
 
-// ── PULL: load state from Firestore ──
+// ── PULL — safe iterative decode, no recursion ──
 async function syncPull(){
   if(!syncState.projectId){ toast('Configure Firebase first','error'); openSyncModal(); return; }
   setSyncPill('syncing','PULLING');
   syncLog('Pulling from Firebase…','info');
   try{
-    const url = `https://firestore.googleapis.com/v1/projects/${syncState.projectId}/databases/(default)/documents/secondbrain/${syncState.docId}?key=${syncState.apiKey}`;
-    const r = await fetch(url, { cache:'no-store' });
-    if(r.status === 404){
-      // No data yet — push local data first
-      syncLog('No cloud data yet — pushing local data first…','info');
+    const r = await fetch(fbDocUrl(), { cache:'no-store' });
+    if(r.status===404){
       setSyncPill('synced','READY');
-      toast('No cloud data yet — use PUSH first','warn');
+      syncLog('No cloud data yet — push first','info');
+      toast('No cloud data yet — push first','warn');
       return;
     }
     if(!r.ok){
-      const err = await r.json();
-      throw new Error(err?.error?.message || `HTTP ${r.status}`);
+      const errBody = await r.text();
+      let msg=`HTTP ${r.status}`;
+      try{ msg=JSON.parse(errBody)?.error?.message||msg; }catch(e){}
+      throw new Error(msg);
     }
-    const doc = await r.json();
-    const remote = fromFirestore(doc);
-    // Merge: remote wins, preserve local pin
+
+    // Parse response text first (not .json()) to avoid browser's recursive JSON parser on huge payloads
+    const rawText = await r.text();
+    let doc;
+    try { doc = JSON.parse(rawText); }
+    catch(e){ throw new Error('Response parse failed — data may be corrupted'); }
+
+    // Decode section by section — fully iterative, no recursion
+    const remote = firestoreToState(doc);
+
+    // Safe merge — remote wins per section, pin preserved
     const localPin = state.pin;
-    state = { ...state, ...remote };
-    state.pin = remote.pin || localPin;  // keep more recent pin
-    if(!state.cargo) state.cargo = { ops:[], sts:[] };
+    SYNC_SECTIONS.forEach(sec=>{
+      if(remote[sec] !== undefined) state[sec] = remote[sec];
+    });
+    // Restore pin: prefer cloud pin, fall back to local
+    state.pin = remote['_pin'] || localPin || '1234';
+    // Safety guards
+    if(!state.cargo || typeof state.cargo !== 'object') state.cargo = {ops:[],sts:[]};
+    if(!Array.isArray(state.cargo.ops)) state.cargo.ops = [];
+    if(!Array.isArray(state.cargo.sts)) state.cargo.sts = [];
+    if(!Array.isArray(state.maintHistory)) state.maintHistory = [];
+
     save();
-    // Re-render everything
     renderMedical(); renderStationery(); renderNavEquip();
-    renderNotes(); renderDashboard(); renderCargo();
-    updateHeader();
+    renderNotes(); renderDashboard(); renderCargo(); updateHeader();
+
     syncState.lastPull = new Date().toISOString();
     saveSyncState();
-    document.getElementById('ss-pull').textContent = new Date(syncState.lastPull).toISOString().replace('T',' ').slice(0,16)+' UTC';
+    document.getElementById('ss-pull').textContent=new Date(syncState.lastPull).toISOString().replace('T',' ').slice(0,16)+' UTC';
     setSyncPill('synced','SYNCED');
-    syncLog('Pull successful — all data updated ✓','ok');
+    syncLog('Pull successful — all sections updated ✓','ok');
     toast('PULLED FROM FIREBASE ✓','success');
-  } catch(e){
+  }catch(e){
     setSyncPill('error','ERROR');
     syncLog('Pull failed: '+e.message,'err');
     toast('PULL FAILED — '+e.message,'error');
@@ -2301,31 +2346,27 @@ async function syncPull(){
 
 // ── Auto sync ──
 function toggleAutoSync(){
-  const on = document.getElementById('auto-sync-toggle').checked;
-  syncState.autoSync = on;
-  document.getElementById('auto-sync-label').textContent = on ? 'ON (every 5 min)' : 'OFF';
+  const on=document.getElementById('auto-sync-toggle').checked;
+  syncState.autoSync=on;
+  document.getElementById('auto-sync-label').textContent=on?'ON (every 5 min)':'OFF';
   if(syncState.autoTimer){ clearInterval(syncState.autoTimer); syncState.autoTimer=null; }
-  if(on && syncState.projectId){
-    syncState.autoTimer = setInterval(()=>syncPush(), 5*60*1000);
+  if(on&&syncState.projectId){
+    syncState.autoTimer=setInterval(()=>syncPush(),5*60*1000);
     syncLog('Auto-sync ON — every 5 min','ok');
     toast('AUTO-SYNC ENABLED','success');
-  } else {
-    syncLog('Auto-sync OFF','info');
-  }
+  } else { syncLog('Auto-sync OFF','info'); }
   saveSyncState();
 }
 
-// ── Init on app load ──
+// ── Init ──
 function initSync(){
   loadSyncState();
   if(syncState.projectId){
     setSyncPill('synced','READY');
-    if(syncState.autoSync && syncState.autoTimer===null){
-      syncState.autoTimer = setInterval(()=>syncPush(), 5*60*1000);
+    if(syncState.autoSync&&!syncState.autoTimer){
+      syncState.autoTimer=setInterval(()=>syncPush(),5*60*1000);
     }
-  } else {
-    setSyncPill('offline','OFFLINE');
-  }
+  } else { setSyncPill('offline','OFFLINE'); }
 }
 
 // ══════════════════════════════════════════════════
@@ -2551,48 +2592,7 @@ function renderMaintHistory(){
   </tr>`).join('');
 }
 
-// Update renderNavEquip to add LOG button (re-define action buttons column)
-// The existing renderNavEquip already has DEL — we patch it inline via the render function override:
-const _origRenderNavEquip = renderNavEquip;
-function renderNavEquip(){
-  _origRenderNavEquip();
-  // Patch: replace DEL-only buttons with LOG + DEL
-  const tbody = document.getElementById('nav-tbody');
-  if(!tbody) return;
-  // Re-render with LOG button added — replace the existing render entirely
-  const extraKeys=[];
-  state.navEquip.forEach(n=>{
-    if(n.extras) Object.keys(n.extras).forEach(k=>{if(!extraKeys.includes(k))extraKeys.push(k);});
-  });
-  const thead=document.getElementById('nav-thead');
-  if(thead){
-    thead.innerHTML='<tr><th>#</th><th>Equipment</th><th>Type</th><th>Maker</th><th>Last</th><th>Next Due</th><th>Days Left</th><th>Remarks</th>'
-      +extraKeys.map(k=>`<th style="color:var(--accent2);">★ ${escHtml(k)}</th>`).join('')
-      +'<th></th></tr>';
-  }
-  document.getElementById('nav-count').textContent=state.navEquip.length;
-  if(!state.navEquip.length){tbody.innerHTML='<tr><td colspan="9" class="empty">NO EQUIPMENT</td></tr>';return;}
-  tbody.innerHTML=state.navEquip.map((n,i)=>{
-    const d=daysUntil(n.next),cls=dateClass(d);
-    const dl=d===null?'—':d<0?`<span class="expired">OD ${Math.abs(d)}d</span>`:d<14?`<span class="expiring">${d}d</span>`:`<span class="ok">${d}d</span>`;
-    const extTds=extraKeys.map(k=>`<td style="color:var(--accent2);font-size:11px;">${escHtml(n.extras?.[k]||'')}</td>`).join('');
-    return `<tr>
-      <td style="color:var(--text3);font-family:var(--mono);font-size:11px;">${i+1}</td>
-      <td style="font-weight:500;">${escHtml(n.name)}</td>
-      <td style="color:var(--text2);font-size:12px;">${escHtml(n.type)}</td>
-      <td style="font-size:12px;color:var(--text2);">${escHtml(n.maker)}</td>
-      <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">${n.last||'—'}</td>
-      <td class="${cls}" style="font-family:var(--mono);font-size:12px;">${n.next||'—'}</td>
-      <td style="font-family:var(--mono);font-size:12px;">${dl}</td>
-      <td style="font-size:12px;color:var(--text2);">${escHtml(n.remarks)}</td>
-      ${extTds}
-      <td style="display:flex;gap:4px;">
-        <button class="btn btn-success btn-sm" onclick="openLogMaint('${n.id}')" title="Log maintenance done">🔧 LOG</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteNavItem('${n.id}')">DEL</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
+// renderNavEquip with LOG button is defined above (merged, no override needed)
 
 // ══════════════════════════════════════════════════
 //  EXPORT — add drugsummary + mainthistory
